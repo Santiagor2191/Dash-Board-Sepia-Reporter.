@@ -1,0 +1,21 @@
+# Workspace dependencies
+**/node_modules/
+**/dist/
+**/coverage/
+
+# Environment and secrets
+**/.env
+**/.env.*
+!**/.env.example
+**/meli-token.json
+
+# Local tooling and logs
+.venv/
+.playwright-cli/
+.claude/
+*.log
+error_mysql.txt
+
+# Data files
+data/**/*.xlsx
+data/**/*.xls
