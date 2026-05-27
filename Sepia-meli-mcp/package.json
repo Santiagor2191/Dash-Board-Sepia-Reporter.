@@ -1,0 +1,25 @@
+{
+  "name": "sepia-meli-mcp",
+  "version": "0.1.0",
+  "description": "MCP server para consultar ordenes, inventario, ventas historicas y conversion de Sepia en Mercado Libre desde Claude.",
+  "private": true,
+  "type": "module",
+  "main": "src/index.js",
+  "bin": {
+    "sepia-meli-mcp": "src/index.js"
+  },
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js",
+    "authorize": "node src/bin/authorize.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.4",
+    "axios": "^1.7.7",
+    "dotenv": "^16.4.5",
+    "pg": "^8.20.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

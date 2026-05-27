@@ -141,8 +141,8 @@ if paquetes:
 # 5. TIPOS DE DATOS
 # =============================================================================
 
-# Fecha
-df["fecha"] = pd.to_datetime(df["fecha"], errors="coerce")
+# Fecha — dayfirst=True para formato colombiano DD/MM/YYYY
+df["fecha"] = pd.to_datetime(df["fecha"], errors="coerce", dayfirst=True)
 
 # Completar anio/mes/num_mes/dia a partir de fecha cuando falten
 df["anio"] = df["anio"].fillna(df["fecha"].dt.year)
@@ -301,9 +301,33 @@ with ENGINE.begin() as conn:
             calidad_dato TEXT,
             periodo_incompleto BOOLEAN,
             archivo_origen TEXT,
-            fecha_carga TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            fecha_carga TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            order_item_id TEXT,
+            meli_order_id TEXT,
+            fecha_ultima_actualizacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """))
+    # Indices usados por el sync incremental desde la API de MeLi
+    conn.execute(text(f"CREATE INDEX IF NOT EXISTS idx_ventas_ml_numero_venta ON {TABLA} (numero_venta)"))
+    conn.execute(text(f"CREATE INDEX IF NOT EXISTS idx_ventas_ml_origen_dato ON {TABLA} (origen_dato)"))
+    # Tabla de auditoria del sync (se conserva entre cargas de Excel)
+    conn.execute(text("""
+        CREATE TABLE IF NOT EXISTS sync_log (
+            id SERIAL PRIMARY KEY,
+            inicio TIMESTAMP NOT NULL,
+            fin TIMESTAMP,
+            duracion_ms INTEGER,
+            rango_desde DATE,
+            rango_hasta DATE,
+            ordenes_procesadas INTEGER DEFAULT 0,
+            ordenes_nuevas INTEGER DEFAULT 0,
+            ordenes_actualizadas INTEGER DEFAULT 0,
+            errores INTEGER DEFAULT 0,
+            mensaje TEXT,
+            estado TEXT NOT NULL DEFAULT 'en_curso'
+        )
+    """))
+    conn.execute(text("CREATE INDEX IF NOT EXISTS idx_sync_log_inicio ON sync_log (inicio DESC)"))
     conn.execute(text(f"TRUNCATE TABLE {TABLA} RESTART IDENTITY CASCADE"))
 print("  Tabla preparada y vaciada.")
 

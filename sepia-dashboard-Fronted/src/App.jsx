@@ -23,6 +23,7 @@ const NAV_ITEMS = [
   { path: "/ventas-meta-ads", label: "Ventas Meta Ads", icon: "MA" },
   { path: "/rentabilidad", label: "Rentabilidad", icon: "$" },
   { path: "/conversion", label: "Conversion", icon: "%" },
+  { path: "/sync", label: "Sync", icon: "⟳" },
 ];
 
 export default function App() {

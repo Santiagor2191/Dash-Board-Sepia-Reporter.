@@ -101,3 +101,5 @@ export const getRentabilidadConPerdida = () => request("/api/rentabilidad/con-pe
 export const getRentabilidadPremiumVsClasica = () => request("/api/rentabilidad/premium-vs-clasica");
 export const getRentabilidadCostoPorVentas = () => request("/api/rentabilidad/costo-por-ventas");
 export const getRentabilidadCostosMap = () => request("/api/rentabilidad/costos-map");
+export const postSyncAhora = () => request("/admin/sync-ahora", { method: "POST" });
+export const getSyncLog = (limit = 20) => request(`/admin/sync-log?limit=${limit}`);

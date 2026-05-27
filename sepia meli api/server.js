@@ -2,6 +2,7 @@ import express from "express";
 import cors from "cors";
 import helmet from "helmet";
 import rateLimit from "express-rate-limit";
+import cron from "node-cron";
 import {
   API_RATE_LIMIT_MAX_REQUESTS,
   API_RATE_LIMIT_WINDOW_MS,
@@ -44,9 +45,13 @@ import { createMeliClient } from "./src/services/meliClient.js";
 import { createMeliOrdersService } from "./src/services/meliOrdersService.js";
 import { createProductAdsService } from "./src/services/productAdsService.js";
 import { createAdsRoutes } from "./src/routes/adsRoutes.js";
+import { createMcpBridgeRouter } from "./src/routes/mcpBridgeRoutes.js";
 import { rentabilidadPool } from "./src/db/rentabilidadPool.js";
 import { createRentabilidadService } from "./src/services/rentabilidadService.js";
 import { createRentabilidadRouter } from "./src/routes/rentabilidadRoutes.js";
+import { createSyncMeliToDbService } from "./src/services/syncMeliToDbService.js";
+import { createSyncRouter } from "./src/routes/syncRoutes.js";
+import { createMeliTokenStore } from "./src/services/meliTokenStore.js";
 
 const app = express();
 
@@ -78,14 +83,20 @@ const metaAdsSalesService = createMetaAdsSalesService({
 });
 
 const oauthStateStore = createOAuthStateStore({ ttlMs: AUTH_STATE_TTL_MS });
+const meliTokenStore = createMeliTokenStore({ dbPool });
 const meliClient = createMeliClient({
   apiBase: MELI_API_BASE,
   clientId: MELI_CLIENT_ID,
   clientSecret: MELI_CLIENT_SECRET,
   redirectUri: MELI_REDIRECT_URI,
   initialTokens: MELI_INITIAL_TOKENS,
-  onTokensUpdated() {
+  onTokensUpdated(tokens) {
     meliOrdersService?.clearCaches();
+    if (tokens) {
+      meliTokenStore.save(tokens).catch((err) =>
+        console.error("[tokens] Error guardando en DB:", err.message)
+      );
+    }
   },
 });
 const {
@@ -104,6 +115,11 @@ meliOrdersService = createMeliOrdersService({
 });
 const productAdsService = createProductAdsService({ meliClient: meliClient, dbPool });
 const rentabilidadService = createRentabilidadService({ rentabilidadPool, dbPool });
+const syncMeliToDbService = createSyncMeliToDbService({
+  mlGet,
+  dbPool,
+  meliOrdersService,
+});
 
 app.use(
   "/auth",
@@ -165,6 +181,31 @@ app.use(
   dbRateLimit,
   createRentabilidadRouter({ rentabilidadService })
 );
+// Lock unico compartido entre el cron horario y el endpoint manual /admin/sync-ahora.
+// Asi evitamos que dos sync corran a la vez sobre la misma base.
+let syncEnEjecucion = false;
+const ejecutarSyncConLock = async ({ daysBack = 14, maxOrders = 1000 } = {}) => {
+  if (syncEnEjecucion) {
+    const err = new Error("Ya hay una sincronizacion en curso");
+    err.statusCode = 409;
+    throw err;
+  }
+  syncEnEjecucion = true;
+  try {
+    return await syncMeliToDbService.syncRecentOrders({ daysBack, maxOrders });
+  } finally {
+    syncEnEjecucion = false;
+  }
+};
+
+app.use(
+  "/admin",
+  dashboardAuth.requireSession,
+  dbRateLimit,
+  createSyncRouter({ syncMeliToDbService, ejecutarSyncConLock }),
+);
+
+app.use(createMcpBridgeRouter());
 
 app.get("/", (req, res) => {
   res.json({ ok: true });
@@ -173,8 +214,36 @@ app.post("/notifications", (req, res) => {
   res.status(200).send("ok");
 });
 
+// Wrapper para correr el sync desde el cron/startup con logging y sin propagar errores
+const correrSyncSeguro = async (contexto) => {
+  const inicio = Date.now();
+  try {
+    const resultado = await ejecutarSyncConLock({ daysBack: 14, maxOrders: 1000 });
+    const segs = ((Date.now() - inicio) / 1000).toFixed(1);
+    console.log(
+      `[sync ${contexto}] OK en ${segs}s — ${resultado.ordenes_procesadas} ordenes, ` +
+      `${resultado.ordenes_nuevas} nuevas, ${resultado.ordenes_actualizadas} actualizadas, ` +
+      `${resultado.errores} errores`,
+    );
+  } catch (error) {
+    if (error?.statusCode === 409) {
+      console.log(`[sync ${contexto}] omitido: ya hay otro sync corriendo`);
+    } else {
+      console.error(`[sync ${contexto}] FALLO:`, error.message);
+    }
+  }
+};
+
 const start = async () => {
-  await loadTokens();
+  const dbTokens = await meliTokenStore.load();
+  if (dbTokens) {
+    console.log("[tokens] Tokens cargados desde PostgreSQL");
+  } else if (MELI_INITIAL_TOKENS) {
+    console.log("[tokens] Tokens cargados desde .env (MELI_INITIAL_TOKENS)");
+  } else {
+    console.log("[tokens] Sin tokens — re-autentica en /auth/meli/login");
+  }
+  await loadTokens(dbTokens ?? MELI_INITIAL_TOKENS);
   app.listen(PORT, HOST, () => {
     console.log(`Servidor corriendo en http://${HOST}:${PORT}`);
     clientesContabilidadService.getDashboard().catch((error) => {
@@ -183,6 +252,15 @@ const start = async () => {
     metaAdsSalesService.ensureSynchronized().catch((error) => {
       console.warn("No se pudo sincronizar Ventas Meta Ads a PostgreSQL:", error.message);
     });
+
+    // Sync inicial al arrancar (no bloquea el servidor)
+    correrSyncSeguro("startup");
+
+    // Sync horario en el minuto 5 de cada hora (zona Colombia)
+    cron.schedule("5 * * * *", () => correrSyncSeguro("cron"), {
+      timezone: "America/Bogota",
+    });
+    console.log("Cron programado: sync MeLi -> PostgreSQL cada hora en el minuto 5 (America/Bogota)");
   });
 };
 

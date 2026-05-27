@@ -19,3 +19,5 @@ error_mysql.txt
 # Data files
 data/**/*.xlsx
 data/**/*.xls
+*.dump
+*.sql.gz

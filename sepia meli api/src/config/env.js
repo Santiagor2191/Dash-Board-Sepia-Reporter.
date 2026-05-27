@@ -76,6 +76,7 @@ export const DB_PORT = toNumber(process.env.DB_PORT, 5432);
 export const DB_USER = process.env.DB_USER || "postgres";
 export const DB_PASSWORD = process.env.DB_PASSWORD || "";
 export const DB_NAME = process.env.DB_NAME || "mercado_libre_oficial";
+export const DB_SSL = (process.env.DB_SSL || "false").toLowerCase() === "true";
 export const DB_CONNECTION_LIMIT = toNumber(process.env.DB_CONNECTION_LIMIT, 5);
 export const RENTABILIDAD_DB_NAME = process.env.RENTABILIDAD_DB_NAME || "publicaciones_ml_contabilidad";
 export const SEPIA_PYTHON_BIN = process.env.SEPIA_PYTHON_BIN || "python";

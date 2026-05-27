@@ -6,6 +6,7 @@ import {
   DB_NAME,
   DB_PASSWORD,
   DB_PORT,
+  DB_SSL,
   DB_USER,
 } from "../config/env.js";
 
@@ -16,6 +17,7 @@ const pgPool = new Pool({
   password: DB_PASSWORD,
   database: DB_NAME,
   max: DB_CONNECTION_LIMIT,
+  ssl: DB_SSL ? { rejectUnauthorized: false } : false,
 });
 
 export const dbPool = {

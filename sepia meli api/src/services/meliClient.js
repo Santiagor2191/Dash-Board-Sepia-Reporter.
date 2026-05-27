@@ -67,8 +67,9 @@ export const createMeliClient = ({
     return now >= new Date(expiresAt).getTime() - bufferMs;
   };
 
-  const loadTokens = async () => {
-    tokens = normalizeTokens(initialTokens);
+  const loadTokens = async (overrideTokens) => {
+    const source = overrideTokens !== undefined ? overrideTokens : initialTokens;
+    tokens = normalizeTokens(source);
     if (typeof onTokensUpdated === "function") onTokensUpdated(tokens);
   };
 
