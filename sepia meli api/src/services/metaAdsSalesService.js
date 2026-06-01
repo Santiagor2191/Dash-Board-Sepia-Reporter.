@@ -122,14 +122,34 @@ export const createMetaAdsSalesService = ({ dbPool, excelPath, pythonBin }) => {
   let syncInFlight = null;
 
   const syncFromExcel = async () => {
-    const fileStat = await stat(excelPath);
-    const mtimeMs = fileStat.mtimeMs;
+    let mtimeMs;
+    try {
+      const fileStat = await stat(excelPath);
+      mtimeMs = fileStat.mtimeMs;
+    } catch (statError) {
+      // En la nube (Render) el Excel local no existe. En vez de fallar,
+      // servimos los datos que ya estan cargados en la base (Neon).
+      console.warn(
+        `metaAds: no se pudo acceder al Excel (${statError?.code || statError?.message}); ` +
+          "se usan los datos ya cargados en la base.",
+      );
+      return;
+    }
 
     if (lastSyncedMtimeMs === mtimeMs) return;
 
-    const payload = await runExtractor({ pythonBin, excelPath });
-    await truncateAndInsert(dbPool, payload.rows || []);
-    lastSyncedMtimeMs = mtimeMs;
+    try {
+      const payload = await runExtractor({ pythonBin, excelPath });
+      await truncateAndInsert(dbPool, payload.rows || []);
+      lastSyncedMtimeMs = mtimeMs;
+    } catch (extractorError) {
+      // Si el extractor falla (p.ej. Python no disponible en la nube),
+      // conservamos los datos ya cargados en la base.
+      console.warn(
+        `metaAds: fallo el extractor (${extractorError?.message || extractorError}); ` +
+          "se usan los datos ya cargados en la base.",
+      );
+    }
   };
 
   const ensureSynchronized = async () => {
@@ -142,6 +162,7 @@ export const createMetaAdsSalesService = ({ dbPool, excelPath, pythonBin }) => {
   };
 
   const getDashboard = async () => {
+    await createTable(dbPool);
     await ensureSynchronized();
 
     const [rows] = await dbPool.query(`
