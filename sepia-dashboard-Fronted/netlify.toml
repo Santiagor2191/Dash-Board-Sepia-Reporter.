@@ -1,0 +1,10 @@
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+# Las rutas internas de React (SPA) se resuelven con public/_redirects.
+# Esto es respaldo por si Netlify no toma ese archivo.
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
