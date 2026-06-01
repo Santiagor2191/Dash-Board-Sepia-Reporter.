@@ -43,13 +43,53 @@ const runProcess = ({ pythonBin, excelPath }) =>
     });
   });
 
+const SNAPSHOT_TABLE = "dashboard_snapshots";
+const SNAPSHOT_KEY = "clientes_contabilidad";
+
+const ensureSnapshotTable = async (dbPool) => {
+  await dbPool.query(`
+    CREATE TABLE IF NOT EXISTS ${SNAPSHOT_TABLE} (
+      clave TEXT PRIMARY KEY,
+      payload JSONB NOT NULL,
+      actualizado_en TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `);
+};
+
 export const createClientesContabilidadService = ({
+  dbPool,
   excelPath,
   pythonBin,
 }) => {
   let cache = null;
 
+  // En la nube (Render) no hay Excel ni Python: leemos el "snapshot" que un
+  // proceso local (tarea programada en el PC) deja precalculado en Neon.
+  const getFromSnapshot = async () => {
+    if (!dbPool) return null;
+    await ensureSnapshotTable(dbPool);
+    const [rows] = await dbPool.query(
+      `SELECT payload FROM ${SNAPSHOT_TABLE} WHERE clave = $1`,
+      [SNAPSHOT_KEY],
+    );
+    if (!rows.length || !rows[0].payload) return null;
+    const payload = rows[0].payload;
+    return typeof payload === "string" ? JSON.parse(payload) : payload;
+  };
+
   const getDashboard = async () => {
+    // 1. Fuente en la nube: snapshot precalculado en Neon.
+    try {
+      const snapshot = await getFromSnapshot();
+      if (snapshot) return snapshot;
+    } catch (snapshotError) {
+      console.warn(
+        `clientesContabilidad: no se pudo leer el snapshot de la BD (${snapshotError?.message || snapshotError}); ` +
+          "se intenta el Excel local.",
+      );
+    }
+
+    // 2. Respaldo (desarrollo local): leer el Excel directamente con Python.
     let mtimeMs = null;
     try {
       const fileStat = await stat(excelPath);

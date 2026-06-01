@@ -73,6 +73,7 @@ const dashboardAuth = createDashboardAuth({
 });
 const historicalSalesService = createHistoricalSalesService({ dbPool });
 const clientesContabilidadService = createClientesContabilidadService({
+  dbPool,
   excelPath: SEPIA_CLIENTES_CONTABILIDAD_EXCEL_PATH,
   pythonBin: SEPIA_PYTHON_BIN,
 });

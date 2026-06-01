@@ -27,16 +27,31 @@ from openpyxl import load_workbook
 
 def _copy_locked_file(src: Path, dst: Path) -> None:
     """
-    Copia un archivo respetando los share modes de Windows. Excel abre el .xlsx
-    con FILE_SHARE_READ, así que el `copy` nativo de Windows puede leerlo aunque
-    Python `open()` falle con PermissionError.
+    Copia un archivo respetando los share modes de Windows. Excel/OneDrive abren
+    el .xlsx con un lock que hace fallar tanto a Python `open()` como al `copy`
+    nativo de cmd. PowerShell Copy-Item (basado en .NET File.Copy) sí respeta los
+    modos de comparticion y logra copiarlo aunque este abierto en Excel.
+    Las rutas se pasan por variables de entorno para evitar problemas con
+    espacios en las carpetas (p.ej. "One Drive", "Excel sepia").
     """
     if os.name == "nt":
         result = subprocess.run(
-            ["cmd", "/c", "copy", "/Y", str(src), str(dst)],
+            [
+                "powershell",
+                "-NoProfile",
+                "-NonInteractive",
+                "-Command",
+                "Copy-Item -LiteralPath $env:SEPIA_COPY_SRC "
+                "-Destination $env:SEPIA_COPY_DST -Force",
+            ],
             capture_output=True,
             text=True,
             shell=False,
+            env={
+                **os.environ,
+                "SEPIA_COPY_SRC": str(src),
+                "SEPIA_COPY_DST": str(dst),
+            },
         )
         if result.returncode != 0:
             raise RuntimeError(
