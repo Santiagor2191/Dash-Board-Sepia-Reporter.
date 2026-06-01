@@ -87,13 +87,26 @@ export const createDashboardAuth = ({
 
   const readSessionToken = (req) => readBearerToken(req) || readSessionCookie(req);
 
-  const getCookieOptions = (req, maxAgeMs = sessionTtlMs) => ({
-    httpOnly: true,
-    sameSite: "lax",
-    secure: Boolean(req.secure),
-    path: "/",
-    maxAge: Math.max(Number(maxAgeMs) || 0, 0),
-  });
+  const getCookieOptions = (req, maxAgeMs = sessionTtlMs) => {
+    // Detecta https directamente (incluso detras de un proxy como Render),
+    // sin depender de trust proxy. Si la conexion es https, usamos
+    // SameSite=None + Secure para que la cookie de sesion viaje entre el
+    // frontend (Netlify) y el backend (Render), que estan en dominios distintos.
+    // En local (http) se mantiene Lax para no romper el desarrollo.
+    const forwardedProto = String(req.headers["x-forwarded-proto"] || "")
+      .split(",")[0]
+      .trim()
+      .toLowerCase();
+    const isHttps = Boolean(req.secure) || forwardedProto === "https";
+
+    return {
+      httpOnly: true,
+      sameSite: isHttps ? "none" : "lax",
+      secure: isHttps,
+      path: "/",
+      maxAge: Math.max(Number(maxAgeMs) || 0, 0),
+    };
+  };
 
   const getDashboardSession = (token) => {
     if (!token) return null;
