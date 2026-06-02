@@ -4,6 +4,8 @@ Documentacion paso a paso para mover el proyecto Sepia BI desde tu PC a un stack
 
 > Para Santiago: esto NO es un manual tecnico denso. Cada fase esta pensada para que la sigas en orden y veas resultados intermedios. Si algo no es claro, preguntas antes de avanzar.
 
+> ✅ **2026-06-01 — Fases 1 y 2 COMPLETAS y en produccion.** Para ver el estado REAL de lo desplegado y como operarlo (incluido el robot de Clientes/Contabilidad), lee **[Estado actual y operacion](estado-actual-y-operacion.md)**. Los `fase-*.md` son el plan original; en algunos puntos la realidad difiere (sobre todo la Fase 4, que se resolvio con un robot local en vez de Microsoft Graph).
+
 ## Indice
 
 1. **[Fase 1 — Base de datos y Backend](fase-1-base-de-datos-y-backend.md)** (1-2 dias)
