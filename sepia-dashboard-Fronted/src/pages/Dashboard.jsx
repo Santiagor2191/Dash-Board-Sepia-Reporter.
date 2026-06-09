@@ -69,10 +69,10 @@ export default function Dashboard() {
 
   const kpis = [
     { stripeClass: "stripe-a", label: "Ordenes Totales", value: fNumber(totalOrders), delta: calcDelta(totalOrders, prevOrdersCount) },
-    { stripeClass: "stripe-b", label: "Monto Reportado", value: fCurrency(totalRevenue), delta: calcDelta(totalRevenue, prevRevenue) },
-    { stripeClass: "stripe-c", label: "Total Ingresado", value: fCurrency(totalIngresado), delta: calcDelta(totalIngresado, prevIngresado) },
+    { stripeClass: "stripe-b", label: "Ingresos Sepia", value: fCurrency(totalRevenue), delta: calcDelta(totalRevenue, prevRevenue) },
+    { stripeClass: "stripe-c", label: "Precio de Venta", value: fCurrency(totalIngresado), delta: calcDelta(totalIngresado, prevIngresado) },
     { stripeClass: "stripe-d", label: "Ticket Promedio", value: fCurrency(ticketAverage), delta: calcDelta(ticketAverage, prevTicket) },
-    { stripeClass: "stripe-e", label: "Productos Activos", value: fNumber(activeProducts), delta: calcDelta(activeProducts, prevProducts) },
+    { stripeClass: "stripe-e", label: "Cargos por Venta", value: fNumber(activeProducts), delta: calcDelta(activeProducts, prevProducts) },
     { stripeClass: "stripe-a", label: "Costo Producto", value: fCurrency(costoProducto), delta: calcDelta(costoProducto, prevCostoProducto) },
   ];
 

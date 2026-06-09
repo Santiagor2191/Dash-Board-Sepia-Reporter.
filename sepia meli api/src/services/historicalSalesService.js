@@ -65,19 +65,33 @@ export const createHistoricalSalesService = ({ dbPool }) => {
     `);
 
     const results = rows.map((row) => {
-      const amount = Number(row.monto_reportado_cop) || 0;
-      const price = Number(row.precio_unitario_publicacion_cop) || amount;
-      const qty = Number(row.cantidad) || 1;
+      const qty = row.cantidad === null || row.cantidad === undefined
+        ? 0
+        : Number(row.cantidad) || 0;
       const date = row.fecha
         ? new Date(row.fecha).toISOString()
         : new Date(row.anio, (row.num_mes || 1) - 1, row.dia || 1).toISOString();
+
+      // En el export oficial de MeLi las columnas tienen semántica invertida:
+      // - ingresos_productos_cop = precio bruto (lo que pagó el comprador)
+      // - monto_reportado_cop    = neto liquidado (después de comisiones y envío)
+      // En los datos históricos manuales es al revés: monto=bruto, ingresos=neto.
+      const isOficial = row.origen_dato === "mercadolibre_oficial";
+      const amount = isOficial
+        ? (Number(row.ingresos_productos_cop) || Number(row.monto_reportado_cop) || 0)
+        : (Number(row.monto_reportado_cop) || 0);
+      const paidAmount = isOficial
+        ? (Number(row.monto_reportado_cop) || 0)
+        : (Number(row.ingresos_productos_cop) || amount);
+
+      const price = Number(row.precio_unitario_publicacion_cop) || amount;
 
       return {
         id: row.numero_venta || row.id,
         date,
         status: mapEstadoToStatus(row.estado, row.monto_reportado_cop),
         amount,
-        paidAmount: Number(row.ingresos_productos_cop) || amount,
+        paidAmount,
         item: {
           id: row.publicacion_id || `HIST-${row.id}`,
           sku: row.sku || "-",

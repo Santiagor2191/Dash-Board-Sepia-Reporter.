@@ -205,6 +205,13 @@ export const createSyncMeliToDbService = ({ mlGet, dbPool, meliOrdersService }) 
     const packId = order.pack_id || null;
     const numeroVenta = packId ? String(packId) : String(order.id);
 
+    // Calcular ratio neto/bruto a partir de los pagos de la orden.
+    // marketplace_fee es la comisión de MeLi (negativo en la API, tomamos abs).
+    const payments = order.payments || [];
+    const totalPaid = payments.reduce((s, p) => s + (Number(p.total_paid_amount) || 0), 0);
+    const totalFee = payments.reduce((s, p) => s + Math.abs(Number(p.marketplace_fee) || 0), 0);
+    const netRatio = totalPaid > 0 ? (totalPaid - totalFee) / totalPaid : 1;
+
     const rows = [];
     for (const lineItem of order.order_items || []) {
       const item = lineItem.item || {};
@@ -235,7 +242,7 @@ export const createSyncMeliToDbService = ({ mlGet, dbPool, meliOrdersService }) 
         variante_talla: buildVarianteTalla(item.variation_attributes),
         cantidad: quantity,
         monto_reportado_cop: lineSubtotal,
-        ingresos_productos_cop: lineSubtotal,
+        ingresos_productos_cop: Math.round(lineSubtotal * netRatio),
         sku: item.seller_sku || lineItem.seller_sku || null,
         publicacion_id: itemId,
         precio_unitario_publicacion_cop: unitPrice,

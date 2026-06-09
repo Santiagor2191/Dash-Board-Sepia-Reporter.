@@ -132,7 +132,6 @@ if len(df) < antes:
 # Filas de paquetes MeLi: producto vacío pero estado dice "Paquete de N productos"
 mask_paquete = df["producto"].isna() & df["estado"].str.contains("Paquete", case=False, na=False)
 df.loc[mask_paquete, "producto"] = df.loc[mask_paquete, "estado"]
-df.loc[mask_paquete, "cantidad"] = 1
 paquetes = mask_paquete.sum()
 if paquetes:
     print(f"  Paquetes MeLi etiquetados: {paquetes}")
