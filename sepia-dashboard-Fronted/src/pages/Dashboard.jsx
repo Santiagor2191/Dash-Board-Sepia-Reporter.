@@ -40,8 +40,8 @@ export default function Dashboard() {
   const totalOrders = filteredAll.length;
   const totalRevenue = filteredAll.reduce((s, o) => s + o.amount, 0);
   const totalIngresado = filteredAll.reduce((s, o) => s + (o.paidAmount || 0), 0);
+  const totalCargos = filteredAll.reduce((s, o) => s + (o.cargosVenta || 0), 0);
   const ticketAverage = totalOrders ? totalIngresado / totalOrders : 0;
-  const activeProducts = new Set(filteredAll.map((o) => o.item.id)).size;
 
   const costoProducto = useMemo(() => {
     let total = 0;
@@ -63,16 +63,16 @@ export default function Dashboard() {
 
   const prevRevenue = previousAll.reduce((s, o) => s + o.amount, 0);
   const prevIngresado = previousAll.reduce((s, o) => s + (o.paidAmount || 0), 0);
+  const prevCargos = previousAll.reduce((s, o) => s + (o.cargosVenta || 0), 0);
   const prevOrdersCount = previousAll.length;
   const prevTicket = prevOrdersCount ? prevIngresado / prevOrdersCount : 0;
-  const prevProducts = new Set(previousAll.map((o) => o.item.id)).size;
 
   const kpis = [
     { stripeClass: "stripe-a", label: "Ordenes Totales", value: fNumber(totalOrders), delta: calcDelta(totalOrders, prevOrdersCount) },
     { stripeClass: "stripe-b", label: "Ingresos Sepia", value: fCurrency(totalRevenue), delta: calcDelta(totalRevenue, prevRevenue) },
     { stripeClass: "stripe-c", label: "Precio de Venta", value: fCurrency(totalIngresado), delta: calcDelta(totalIngresado, prevIngresado) },
     { stripeClass: "stripe-d", label: "Ticket Promedio", value: fCurrency(ticketAverage), delta: calcDelta(ticketAverage, prevTicket) },
-    { stripeClass: "stripe-e", label: "Cargos por Venta", value: fNumber(activeProducts), delta: calcDelta(activeProducts, prevProducts) },
+    { stripeClass: "stripe-e", label: "Cargos por Venta", value: fCurrency(totalCargos), delta: calcDelta(totalCargos, prevCargos) },
     { stripeClass: "stripe-a", label: "Costo Producto", value: fCurrency(costoProducto), delta: calcDelta(costoProducto, prevCostoProducto) },
   ];
 
