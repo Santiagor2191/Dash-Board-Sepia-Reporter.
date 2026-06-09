@@ -146,7 +146,7 @@ export const createSyncMeliToDbService = ({ mlGet, dbPool, meliOrdersService }) 
       INSERT INTO ventas_ml (
         id_unico, anio, num_mes, dia, fecha, numero_venta, estado,
         producto, categoria, variante_talla, cantidad,
-        monto_reportado_cop, ingresos_productos_cop,
+        monto_reportado_cop, ingresos_productos_cop, cargo_venta_impuestos_cop,
         sku, publicacion_id, precio_unitario_publicacion_cop,
         comprador, ciudad, forma_entrega,
         origen_dato, calidad_dato, periodo_incompleto, archivo_origen,
@@ -154,17 +154,18 @@ export const createSyncMeliToDbService = ({ mlGet, dbPool, meliOrdersService }) 
       ) VALUES (
         $1, $2, $3, $4, $5, $6, $7,
         $8, $9, $10, $11,
-        $12, $13,
-        $14, $15, $16,
-        $17, $18, $19,
-        $20, $21, $22, $23,
-        $24, $25, NOW()
+        $12, $13, $14,
+        $15, $16, $17,
+        $18, $19, $20,
+        $21, $22, $23, $24,
+        $25, $26, NOW()
       )
       ON CONFLICT (id_unico) DO UPDATE SET
         estado = EXCLUDED.estado,
         cantidad = EXCLUDED.cantidad,
         monto_reportado_cop = EXCLUDED.monto_reportado_cop,
         ingresos_productos_cop = EXCLUDED.ingresos_productos_cop,
+        cargo_venta_impuestos_cop = EXCLUDED.cargo_venta_impuestos_cop,
         precio_unitario_publicacion_cop = EXCLUDED.precio_unitario_publicacion_cop,
         producto = COALESCE(EXCLUDED.producto, ventas_ml.producto),
         categoria = COALESCE(EXCLUDED.categoria, ventas_ml.categoria),
@@ -177,7 +178,7 @@ export const createSyncMeliToDbService = ({ mlGet, dbPool, meliOrdersService }) 
       [
         row.id_unico, row.anio, row.num_mes, row.dia, row.fecha, row.numero_venta, row.estado,
         row.producto, row.categoria, row.variante_talla, row.cantidad,
-        row.monto_reportado_cop, row.ingresos_productos_cop,
+        row.monto_reportado_cop, row.ingresos_productos_cop, row.cargo_venta_impuestos_cop,
         row.sku, row.publicacion_id, row.precio_unitario_publicacion_cop,
         row.comprador, row.ciudad, row.forma_entrega,
         row.origen_dato, row.calidad_dato, row.periodo_incompleto, row.archivo_origen,
@@ -205,12 +206,13 @@ export const createSyncMeliToDbService = ({ mlGet, dbPool, meliOrdersService }) 
     const packId = order.pack_id || null;
     const numeroVenta = packId ? String(packId) : String(order.id);
 
-    // Calcular ratio neto/bruto a partir de los pagos de la orden.
-    // marketplace_fee es la comisión de MeLi (negativo en la API, tomamos abs).
+    // Campos monetarios de la orden a nivel de orden completa.
+    // paid_amount = lo que pagó el comprador en total (incluye envío si aplica).
+    // marketplace_fee en payments = comisión MeLi (negativo).
     const payments = order.payments || [];
-    const totalPaid = payments.reduce((s, p) => s + (Number(p.total_paid_amount) || 0), 0);
-    const totalFee = payments.reduce((s, p) => s + Math.abs(Number(p.marketplace_fee) || 0), 0);
-    const netRatio = totalPaid > 0 ? (totalPaid - totalFee) / totalPaid : 1;
+    const n = (order.order_items || []).length || 1;
+    const orderPaidAmount = Number(order.paid_amount) || 0;
+    const totalFee = payments.reduce((s, p) => s + (Number(p.marketplace_fee) || 0), 0); // negativo
 
     const rows = [];
     for (const lineItem of order.order_items || []) {
@@ -220,6 +222,9 @@ export const createSyncMeliToDbService = ({ mlGet, dbPool, meliOrdersService }) 
       const unitPrice = Number(lineItem.unit_price) || 0;
       const quantity = Number(lineItem.quantity) || 1;
       const lineSubtotal = Math.round(unitPrice * quantity);
+      // Prorratear paid_amount y fee entre los N items de la orden
+      const montoReportado = orderPaidAmount > 0 ? Math.round(orderPaidAmount / n) : lineSubtotal;
+      const cargoVenta = Math.round(totalFee / n); // negativo o 0
 
       let categoria = item.category_name || null;
       if (!categoria && item.category_id && meliOrdersService?.getCategoryName) {
@@ -241,8 +246,9 @@ export const createSyncMeliToDbService = ({ mlGet, dbPool, meliOrdersService }) 
         categoria,
         variante_talla: buildVarianteTalla(item.variation_attributes),
         cantidad: quantity,
-        monto_reportado_cop: lineSubtotal,
-        ingresos_productos_cop: Math.round(lineSubtotal * netRatio),
+        monto_reportado_cop: montoReportado,
+        ingresos_productos_cop: lineSubtotal,
+        cargo_venta_impuestos_cop: cargoVenta || null,
         sku: item.seller_sku || lineItem.seller_sku || null,
         publicacion_id: itemId,
         precio_unitario_publicacion_cop: unitPrice,
