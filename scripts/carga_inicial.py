@@ -28,9 +28,34 @@ load_dotenv(dotenv_path=env_path)
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_EXCEL_PATH = PROJECT_ROOT / "data" / "Historico" / "mercado_libre_oficial.xlsx"
+ONEDRIVE_EXCEL_PATH = Path(r"C:\Users\SANTIAGO\One Drive\OneDrive\Excel sepia\Mercado LibreOFICIAL .xlsx")
 
-ARCHIVO_EXCEL = Path(os.getenv("SEPIA_EXCEL_SOURCE_PATH", str(DEFAULT_EXCEL_PATH)))
-HOJA = os.getenv("SEPIA_EXCEL_SHEET", "Ventas_Unificadas")
+def _resolve_excel_path():
+    env_path = os.getenv("SEPIA_EXCEL_SOURCE_PATH")
+    if env_path:
+        return Path(env_path)
+    if DEFAULT_EXCEL_PATH.exists():
+        return DEFAULT_EXCEL_PATH
+    if ONEDRIVE_EXCEL_PATH.exists():
+        return ONEDRIVE_EXCEL_PATH
+    return DEFAULT_EXCEL_PATH  # dejará fallar con mensaje claro
+
+def _resolve_sheet(excel_path: Path):
+    env_sheet = os.getenv("SEPIA_EXCEL_SHEET")
+    if env_sheet:
+        return env_sheet
+    # Detectar hoja automáticamente
+    import openpyxl
+    wb = openpyxl.load_workbook(excel_path, read_only=True, data_only=True)
+    sheets = wb.sheetnames
+    wb.close()
+    for candidate in ("Ventas_Unificadas", "Data", "Ventas"):
+        if candidate in sheets:
+            return candidate
+    return sheets[0]
+
+ARCHIVO_EXCEL = _resolve_excel_path()
+HOJA = _resolve_sheet(ARCHIVO_EXCEL) if ARCHIVO_EXCEL.exists() else os.getenv("SEPIA_EXCEL_SHEET", "Data")
 
 USUARIO = os.getenv("DB_USER", "postgres")
 PASSWORD = os.getenv("DB_PASSWORD", "")

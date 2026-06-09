@@ -206,12 +206,12 @@ export const createSyncMeliToDbService = ({ mlGet, dbPool, meliOrdersService }) 
     const packId = order.pack_id || null;
     const numeroVenta = packId ? String(packId) : String(order.id);
 
-    // Campos monetarios de la orden a nivel de orden completa.
-    // paid_amount = lo que pagó el comprador en total (incluye envío si aplica).
-    // marketplace_fee en payments = comisión MeLi (negativo).
+    // marketplace_fee de los pagos = comisión MeLi (negativo).
+    // ingresos_productos_cop = precio bruto (lo que pagó el comprador).
+    // monto_reportado_cop    = neto al vendedor = bruto + cargo (cargo es negativo).
+    // cargo_venta_impuestos  = comisión MeLi prorrateada por ítem.
     const payments = order.payments || [];
     const n = (order.order_items || []).length || 1;
-    const orderPaidAmount = Number(order.paid_amount) || 0;
     const totalFee = payments.reduce((s, p) => s + (Number(p.marketplace_fee) || 0), 0); // negativo
 
     const rows = [];
@@ -222,9 +222,8 @@ export const createSyncMeliToDbService = ({ mlGet, dbPool, meliOrdersService }) 
       const unitPrice = Number(lineItem.unit_price) || 0;
       const quantity = Number(lineItem.quantity) || 1;
       const lineSubtotal = Math.round(unitPrice * quantity);
-      // Prorratear paid_amount y fee entre los N items de la orden
-      const montoReportado = orderPaidAmount > 0 ? Math.round(orderPaidAmount / n) : lineSubtotal;
-      const cargoVenta = Math.round(totalFee / n); // negativo o 0
+      const cargoVenta = Math.round(totalFee / n);           // negativo o 0
+      const montoReportado = lineSubtotal + cargoVenta;      // neto = bruto - comisión
 
       let categoria = item.category_name || null;
       if (!categoria && item.category_id && meliOrdersService?.getCategoryName) {
