@@ -1,11 +1,18 @@
-import { useMemo } from "react";
+import { useMemo, useEffect, useState } from "react";
 import { useOutletContext } from "react-router-dom";
 import KPI from "../components/KPI";
+import { getInventory } from "../api";
 import {
   fCurrency, fNumber, fDate, calcDelta,
   getPeriodStart, getPeriodLabel, addPeriods, getOrderTone,
   COMPARISON_OPTIONS,
 } from "../utils";
+
+const STOCK_ALERT_CONFIG = {
+  sin_stock: { label: "Sin stock", color: "#ef4444" },
+  critico:   { label: "Crítico",   color: "#f97316" },
+  bajo:      { label: "Bajo",      color: "#f59e0b" },
+};
 
 const getOrdersPanelTitle = (comparison) => {
   if (comparison === "quarter") return "Ordenes por trimestre";
@@ -15,6 +22,28 @@ const getOrdersPanelTitle = (comparison) => {
 
 export default function Dashboard() {
   const { filteredAll, ordersSource, appliedComparison, time, costosMap } = useOutletContext();
+
+  const [stockAlerts, setStockAlerts] = useState([]);
+  const [stockLoading, setStockLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    getInventory()
+      .then((data) => {
+        if (cancelled) return;
+        const alerts = (data.items || [])
+          .filter((i) => i.status === "active" && i.stock_alert in STOCK_ALERT_CONFIG)
+          .sort((a, b) => {
+            const order = { sin_stock: 0, critico: 1, bajo: 2 };
+            return (order[a.stock_alert] ?? 3) - (order[b.stock_alert] ?? 3)
+              || a.available_quantity - b.available_quantity;
+          });
+        setStockAlerts(alerts);
+      })
+      .catch(() => { if (!cancelled) setStockAlerts(null); })
+      .finally(() => { if (!cancelled) setStockLoading(false); });
+    return () => { cancelled = true; };
+  }, []);
 
   const sortedOrders = useMemo(() => [...filteredAll].sort((a, b) => new Date(b.date) - new Date(a.date)), [filteredAll]);
 
@@ -165,6 +194,41 @@ export default function Dashboard() {
             </tbody>
           </table>
         </div>
+      </section>
+
+      <section className="panel">
+        <header className="panel-head">
+          <h2>Alertas de stock</h2>
+          {!stockLoading && stockAlerts !== null && (
+            <span>{stockAlerts.length ? `${stockAlerts.length} productos` : "Sin alertas ✓"}</span>
+          )}
+        </header>
+        {stockLoading ? (
+          <div className="empty-state">Cargando inventario...</div>
+        ) : stockAlerts === null ? (
+          <div className="empty-state">Conecta Mercado Libre para ver alertas de stock.</div>
+        ) : stockAlerts.length === 0 ? (
+          <div className="empty-state">Todo el inventario está en niveles normales.</div>
+        ) : (
+          <div className="table-wrap">
+            <table>
+              <thead><tr><th>Producto</th><th>Stock</th><th>Estado</th><th>Días restantes</th></tr></thead>
+              <tbody>
+                {stockAlerts.slice(0, 15).map((item) => {
+                  const cfg = STOCK_ALERT_CONFIG[item.stock_alert];
+                  return (
+                    <tr key={item.id}>
+                      <td>{item.title}</td>
+                      <td>{fNumber(item.available_quantity)}</td>
+                      <td><span className="pill" style={{ background: `${cfg.color}22`, color: cfg.color }}>{cfg.label}</span></td>
+                      <td>{item.days_of_stock > 0 ? `${Math.round(item.days_of_stock)}d` : "—"}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
       </section>
     </>
   );
