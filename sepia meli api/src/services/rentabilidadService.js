@@ -169,7 +169,17 @@ export const createRentabilidadService = ({ rentabilidadPool, dbPool }) => {
     `);
     const map = {};
     for (const r of rows) {
-      map[r.id_publicaciones] = Number(r.costo_total);
+      const id = r.id_publicaciones;
+      const costo = Number(r.costo_total);
+      map[id] = costo;
+      // MeLi usa MCO y MCOU para el mismo producto segun si es publicacion
+      // historica o actual. Registramos ambas versiones para que el lookup
+      // funcione independientemente del formato que tenga ventas_ml.
+      if (id.startsWith("MCOU")) {
+        map[id.replace("MCOU", "MCO")] = costo;
+      } else if (id.startsWith("MCO")) {
+        map[id.replace("MCO", "MCOU")] = costo;
+      }
     }
     return map;
   };
