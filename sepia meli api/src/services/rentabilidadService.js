@@ -163,13 +163,13 @@ export const createRentabilidadService = ({ rentabilidadPool, dbPool }) => {
 
   const getCostosMap = async () => {
     const [rows] = await rentabilidadPool.query(`
-      SELECT id_publicaciones, costo_inicial
+      SELECT id_publicaciones, costo_total
       FROM publicaciones_rentabilidad
-      WHERE costo_inicial IS NOT NULL AND costo_inicial > 0
+      WHERE costo_total IS NOT NULL AND costo_total > 0
     `);
     const map = {};
     for (const r of rows) {
-      map[r.id_publicaciones] = Number(r.costo_inicial);
+      map[r.id_publicaciones] = Number(r.costo_total);
     }
     return map;
   };
