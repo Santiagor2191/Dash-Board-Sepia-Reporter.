@@ -60,8 +60,8 @@ export const createRentabilidadRouter = ({ rentabilidadService }) => {
 
   router.get("/costos-map", async (req, res) => {
     try {
-      const data = await rentabilidadService.getCostosMap();
-      return res.json({ ok: true, costos: data });
+      const { costos, costosPorTitulo } = await rentabilidadService.getCostosMap();
+      return res.json({ ok: true, costos, costosPorTitulo });
     } catch (error) {
       return sendInternalError(res, "Error consultando mapa de costos", "No se pudo consultar los costos por publicacion", error);
     }

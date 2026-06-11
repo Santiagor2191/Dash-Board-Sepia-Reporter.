@@ -161,27 +161,38 @@ export const createRentabilidadService = ({ rentabilidadPool, dbPool }) => {
     };
   };
 
+  // Normaliza un titulo para comparacion: minusculas, sin tildes, sin
+  // caracteres especiales, primeros 45 chars. Permite hacer fallback por
+  // nombre cuando MCO y MCOU tienen numeros distintos para el mismo producto.
+  const normalizeTitle = (t) => {
+    if (!t) return "";
+    return t.toLowerCase()
+      .normalize("NFD").replace(/[̀-ͯ]/g, "")
+      .replace(/[^a-z0-9 ]/g, " ")
+      .replace(/\s+/g, " ")
+      .trim()
+      .substring(0, 45);
+  };
+
   const getCostosMap = async () => {
     const [rows] = await rentabilidadPool.query(`
-      SELECT id_publicaciones, costo_total
+      SELECT id_publicaciones, titulo, costo_total
       FROM publicaciones_rentabilidad
       WHERE costo_total IS NOT NULL AND costo_total > 0
     `);
-    const map = {};
+    const costos = {};
+    const costosPorTitulo = {};
     for (const r of rows) {
       const id = r.id_publicaciones;
       const costo = Number(r.costo_total);
-      map[id] = costo;
-      // MeLi usa MCO y MCOU para el mismo producto segun si es publicacion
-      // historica o actual. Registramos ambas versiones para que el lookup
-      // funcione independientemente del formato que tenga ventas_ml.
-      if (id.startsWith("MCOU")) {
-        map[id.replace("MCOU", "MCO")] = costo;
-      } else if (id.startsWith("MCO")) {
-        map[id.replace("MCO", "MCOU")] = costo;
-      }
+      // Mapa por ID — ambas variantes MCO/MCOU
+      costos[id] = costo;
+      if (id.startsWith("MCOU")) costos[id.replace("MCOU", "MCO")] = costo;
+      else if (id.startsWith("MCO")) costos[id.replace("MCO", "MCOU")] = costo;
+      // Mapa por titulo normalizado como fallback
+      if (r.titulo) costosPorTitulo[normalizeTitle(r.titulo)] = costo;
     }
-    return map;
+    return { costos, costosPorTitulo };
   };
 
   return {

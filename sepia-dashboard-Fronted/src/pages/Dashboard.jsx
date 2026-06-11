@@ -21,7 +21,17 @@ const getOrdersPanelTitle = (comparison) => {
 };
 
 export default function Dashboard() {
-  const { filteredAll, ordersSource, appliedComparison, time, costosMap } = useOutletContext();
+  const { filteredAll, ordersSource, appliedComparison, time, costosMap, costosTitleMap } = useOutletContext();
+
+  const normalizeTitle = (t) => {
+    if (!t) return "";
+    return t.toLowerCase()
+      .normalize("NFD").replace(/[̀-ͯ]/g, "")
+      .replace(/[^a-z0-9 ]/g, " ")
+      .replace(/\s+/g, " ")
+      .trim()
+      .substring(0, 45);
+  };
 
   const [stockAlerts, setStockAlerts] = useState([]);
   const [stockLoading, setStockLoading] = useState(true);
@@ -72,23 +82,20 @@ export default function Dashboard() {
   const totalCargos = filteredAll.reduce((s, o) => s + (o.cargosVenta || 0), 0);
   const ticketAverage = totalOrders ? totalIngresado / totalOrders : 0;
 
+  const getCosto = (o) =>
+    costosMap?.[o.item.id] ?? costosTitleMap?.[normalizeTitle(o.item.title)] ?? 0;
+
   const costoProducto = useMemo(() => {
     let total = 0;
-    for (const o of filteredAll) {
-      const costo = costosMap?.[o.item.id];
-      if (costo) total += costo * o.qty;
-    }
+    for (const o of filteredAll) total += getCosto(o) * o.qty;
     return total;
-  }, [filteredAll, costosMap]);
+  }, [filteredAll, costosMap, costosTitleMap]);
 
   const prevCostoProducto = useMemo(() => {
     let total = 0;
-    for (const o of previousAll) {
-      const costo = costosMap?.[o.item.id];
-      if (costo) total += costo * o.qty;
-    }
+    for (const o of previousAll) total += getCosto(o) * o.qty;
     return total;
-  }, [previousAll, costosMap]);
+  }, [previousAll, costosMap, costosTitleMap]);
 
   const prevRevenue = previousAll.reduce((s, o) => s + o.amount, 0);
   const prevIngresado = previousAll.reduce((s, o) => s + (o.paidAmount || 0), 0);
