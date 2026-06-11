@@ -57,9 +57,15 @@ export default function App() {
   const [draftYears, setDraftYears] = useState([]);
   const [draftMonths, setDraftMonths] = useState(ALL_MONTH_VALUES);
   const [draftComparison, setDraftComparison] = useState("month");
+  const [draftDateFrom, setDraftDateFrom] = useState("");
+  const [draftDateTo, setDraftDateTo] = useState("");
+  const [filterMode, setFilterMode] = useState("period");
   const [appliedYears, setAppliedYears] = useState([]);
   const [appliedMonths, setAppliedMonths] = useState(ALL_MONTH_VALUES);
   const [appliedComparison, setAppliedComparison] = useState("month");
+  const [appliedDateFrom, setAppliedDateFrom] = useState("");
+  const [appliedDateTo, setAppliedDateTo] = useState("");
+  const [appliedFilterMode, setAppliedFilterMode] = useState("period");
 
   // Clock
   useEffect(() => {
@@ -212,13 +218,23 @@ export default function App() {
   }, [allYears, appliedYears.length]);
 
   const filteredAll = useMemo(() => {
+    if (appliedFilterMode === "range") {
+      const from = appliedDateFrom ? new Date(appliedDateFrom + "T00:00:00") : null;
+      const to = appliedDateTo ? new Date(appliedDateTo + "T23:59:59") : null;
+      return ordersSource.filter((o) => {
+        const d = new Date(o.date);
+        if (from && d < from) return false;
+        if (to && d > to) return false;
+        return true;
+      });
+    }
     const years = new Set(appliedYears.length ? appliedYears : allYears);
     const months = new Set(appliedMonths.length ? appliedMonths : ALL_MONTH_VALUES);
     return ordersSource.filter((o) => {
       const d = new Date(o.date);
       return years.has(d.getFullYear()) && months.has(d.getMonth() + 1);
     });
-  }, [ordersSource, appliedYears, appliedMonths, allYears]);
+  }, [ordersSource, appliedFilterMode, appliedYears, appliedMonths, appliedDateFrom, appliedDateTo, allYears]);
 
   const paidOrders = useMemo(() => filteredAll.filter((o) => o.status === "paid"), [filteredAll]);
 
@@ -250,18 +266,30 @@ export default function App() {
   };
 
   const applyFilters = () => {
-    const nextYears = draftYears.length ? [...draftYears] : allYears;
-    const nextMonths = draftMonths.length ? [...draftMonths] : ALL_MONTH_VALUES;
-    setDraftYears(nextYears);
-    setDraftMonths(nextMonths);
-    setAppliedYears(nextYears);
-    setAppliedMonths(nextMonths);
+    setAppliedFilterMode(filterMode);
     setAppliedComparison(draftComparison);
+    if (filterMode === "range") {
+      setAppliedDateFrom(draftDateFrom);
+      setAppliedDateTo(draftDateTo);
+    } else {
+      const nextYears = draftYears.length ? [...draftYears] : allYears;
+      const nextMonths = draftMonths.length ? [...draftMonths] : ALL_MONTH_VALUES;
+      setDraftYears(nextYears);
+      setDraftMonths(nextMonths);
+      setAppliedYears(nextYears);
+      setAppliedMonths(nextMonths);
+    }
     setOpenDropdown(null);
     if (isMobileViewport) setSidebarMobileOpen(false);
   };
 
   const resetFilters = () => {
+    setFilterMode("period");
+    setDraftDateFrom("");
+    setDraftDateTo("");
+    setAppliedFilterMode("period");
+    setAppliedDateFrom("");
+    setAppliedDateTo("");
     setDraftYears(allYears);
     setDraftMonths(ALL_MONTH_VALUES);
     setDraftComparison("month");
@@ -400,8 +428,14 @@ export default function App() {
         <div className="sidebar-filters">
           <div className="sidebar-section-title">Filtro rapido</div>
           <div className="sidebar-chip-row">
-            <span className="chip">Anios: {appliedYears.length}</span>
-            <span className="chip">Meses: {appliedMonths.length}</span>
+            {appliedFilterMode === "range" ? (
+              <span className="chip">{appliedDateFrom || "Inicio"} → {appliedDateTo || "Hoy"}</span>
+            ) : (
+              <>
+                <span className="chip">Años: {appliedYears.length}</span>
+                <span className="chip">Meses: {appliedMonths.length}</span>
+              </>
+            )}
             <span className="chip">{COMPARISON_OPTIONS.find((o) => o.id === appliedComparison)?.label}</span>
           </div>
         </div>
@@ -424,8 +458,22 @@ export default function App() {
               </div>
             </div>
             <div className="topbar-right">
-              <MultiSelectDropdown title="Anio" options={allYears.map((y) => ({ value: y, label: String(y) }))} open={openDropdown === "year"} onToggle={() => setOpenDropdown((p) => p === "year" ? null : "year")} selectedValues={draftYears} searchValue={yearSearch} onSearchChange={setYearSearch} onToggleValue={(v) => toggleMulti(v, setDraftYears)} onSelectAll={() => setDraftYears(allYears)} onClear={() => setDraftYears([])} />
-              <MultiSelectDropdown title="Mes" options={MONTHS} open={openDropdown === "month"} onToggle={() => setOpenDropdown((p) => p === "month" ? null : "month")} selectedValues={draftMonths} searchValue={monthSearch} onSearchChange={setMonthSearch} onToggleValue={(v) => toggleMulti(v, setDraftMonths)} onSelectAll={() => setDraftMonths(ALL_MONTH_VALUES)} onClear={() => setDraftMonths([])} />
+              <div className="comparison-group">
+                <button type="button" className={`comparison-btn ${filterMode === "period" ? "active" : ""}`} onClick={() => setFilterMode("period")}>Año/Mes</button>
+                <button type="button" className={`comparison-btn ${filterMode === "range" ? "active" : ""}`} onClick={() => setFilterMode("range")}>Rango libre</button>
+              </div>
+              {filterMode === "period" ? (
+                <>
+                  <MultiSelectDropdown title="Anio" options={allYears.map((y) => ({ value: y, label: String(y) }))} open={openDropdown === "year"} onToggle={() => setOpenDropdown((p) => p === "year" ? null : "year")} selectedValues={draftYears} searchValue={yearSearch} onSearchChange={setYearSearch} onToggleValue={(v) => toggleMulti(v, setDraftYears)} onSelectAll={() => setDraftYears(allYears)} onClear={() => setDraftYears([])} />
+                  <MultiSelectDropdown title="Mes" options={MONTHS} open={openDropdown === "month"} onToggle={() => setOpenDropdown((p) => p === "month" ? null : "month")} selectedValues={draftMonths} searchValue={monthSearch} onSearchChange={setMonthSearch} onToggleValue={(v) => toggleMulti(v, setDraftMonths)} onSelectAll={() => setDraftMonths(ALL_MONTH_VALUES)} onClear={() => setDraftMonths([])} />
+                </>
+              ) : (
+                <div className="date-range-group">
+                  <input type="date" className="date-input" value={draftDateFrom} onChange={(e) => setDraftDateFrom(e.target.value)} />
+                  <span className="date-sep">→</span>
+                  <input type="date" className="date-input" value={draftDateTo} onChange={(e) => setDraftDateTo(e.target.value)} />
+                </div>
+              )}
               <div className="comparison-group">
                 {COMPARISON_OPTIONS.map((opt) => (
                   <button key={opt.id} type="button" className={`comparison-btn ${draftComparison === opt.id ? "active" : ""}`} onClick={() => setDraftComparison(opt.id)}>{opt.label}</button>

@@ -399,6 +399,38 @@ html[data-theme="dark"] {
   color: var(--text);
 }
 
+.date-range-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.date-input {
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  color: var(--text);
+  font-size: 0.82rem;
+  padding: 4px 8px;
+  cursor: pointer;
+  outline: none;
+}
+
+.date-input:focus {
+  border-color: rgba(56, 189, 248, 0.5);
+}
+
+.date-input::-webkit-calendar-picker-indicator {
+  filter: invert(0.5);
+  cursor: pointer;
+}
+
+.date-sep {
+  color: var(--muted);
+  font-size: 0.82rem;
+  user-select: none;
+}
+
 .comparison-group-compact {
   flex-wrap: wrap;
 }
