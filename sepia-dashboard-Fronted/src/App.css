@@ -198,22 +198,52 @@ body {
 
 .sidebar-filters {
   margin: 10px;
-  border: 1px solid var(--line);
-  background: var(--glass);
-  border-radius: 14px;
   padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  overflow: visible;
 }
 
 .sidebar-section-title {
   font-family: "Space Grotesk", sans-serif;
   font-size: 0.85rem;
-  margin-bottom: 10px;
+  color: var(--muted);
 }
 
 .sidebar-chip-row {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+}
+
+.sidebar-full-width {
+  width: 100%;
+}
+
+.sidebar-filter-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.date-range-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.sidebar-filters .comparison-group {
+  border-radius: 10px;
+}
+
+.sidebar-filters .dropdown-trigger {
+  width: 100%;
+  min-width: unset;
+}
+
+.sidebar-filters .dropdown {
+  width: 100%;
 }
 
 .chip {

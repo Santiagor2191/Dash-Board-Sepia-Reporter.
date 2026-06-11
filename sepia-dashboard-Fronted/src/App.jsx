@@ -426,17 +426,27 @@ export default function App() {
           ))}
         </nav>
         <div className="sidebar-filters">
-          <div className="sidebar-section-title">Filtro rapido</div>
-          <div className="sidebar-chip-row">
-            {appliedFilterMode === "range" ? (
-              <span className="chip">{appliedDateFrom || "Inicio"} → {appliedDateTo || "Hoy"}</span>
-            ) : (
-              <>
-                <span className="chip">Años: {appliedYears.length}</span>
-                <span className="chip">Meses: {appliedMonths.length}</span>
-              </>
-            )}
-            <span className="chip">{COMPARISON_OPTIONS.find((o) => o.id === appliedComparison)?.label}</span>
+          <div className="sidebar-section-title">Filtros</div>
+          <div className="comparison-group sidebar-full-width">
+            <button type="button" className={`comparison-btn ${filterMode === "period" ? "active" : ""}`} onClick={() => setFilterMode("period")}>Año/Mes</button>
+            <button type="button" className={`comparison-btn ${filterMode === "range" ? "active" : ""}`} onClick={() => setFilterMode("range")}>Rango libre</button>
+          </div>
+          {filterMode === "period" ? (
+            <div className="sidebar-filter-controls">
+              <MultiSelectDropdown title="Anio" options={allYears.map((y) => ({ value: y, label: String(y) }))} open={openDropdown === "year"} onToggle={() => setOpenDropdown((p) => p === "year" ? null : "year")} selectedValues={draftYears} searchValue={yearSearch} onSearchChange={setYearSearch} onToggleValue={(v) => toggleMulti(v, setDraftYears)} onSelectAll={() => setDraftYears(allYears)} onClear={() => setDraftYears([])} />
+              <MultiSelectDropdown title="Mes" options={MONTHS} open={openDropdown === "month"} onToggle={() => setOpenDropdown((p) => p === "month" ? null : "month")} selectedValues={draftMonths} searchValue={monthSearch} onSearchChange={setMonthSearch} onToggleValue={(v) => toggleMulti(v, setDraftMonths)} onSelectAll={() => setDraftMonths(ALL_MONTH_VALUES)} onClear={() => setDraftMonths([])} />
+            </div>
+          ) : (
+            <div className="date-range-sidebar">
+              <input type="date" className="date-input sidebar-full-width" value={draftDateFrom} onChange={(e) => setDraftDateFrom(e.target.value)} />
+              <span className="date-sep">→</span>
+              <input type="date" className="date-input sidebar-full-width" value={draftDateTo} onChange={(e) => setDraftDateTo(e.target.value)} />
+            </div>
+          )}
+          <div className="comparison-group sidebar-full-width">
+            {COMPARISON_OPTIONS.map((opt) => (
+              <button key={opt.id} type="button" className={`comparison-btn ${draftComparison === opt.id ? "active" : ""}`} onClick={() => setDraftComparison(opt.id)}>{opt.label}</button>
+            ))}
           </div>
         </div>
         <div className="sidebar-footer">
@@ -458,40 +468,14 @@ export default function App() {
               </div>
             </div>
             <div className="topbar-right">
-              <div className="comparison-group">
-                <button type="button" className={`comparison-btn ${filterMode === "period" ? "active" : ""}`} onClick={() => setFilterMode("period")}>Año/Mes</button>
-                <button type="button" className={`comparison-btn ${filterMode === "range" ? "active" : ""}`} onClick={() => setFilterMode("range")}>Rango libre</button>
-              </div>
-              {filterMode === "period" ? (
-                <>
-                  <MultiSelectDropdown title="Anio" options={allYears.map((y) => ({ value: y, label: String(y) }))} open={openDropdown === "year"} onToggle={() => setOpenDropdown((p) => p === "year" ? null : "year")} selectedValues={draftYears} searchValue={yearSearch} onSearchChange={setYearSearch} onToggleValue={(v) => toggleMulti(v, setDraftYears)} onSelectAll={() => setDraftYears(allYears)} onClear={() => setDraftYears([])} />
-                  <MultiSelectDropdown title="Mes" options={MONTHS} open={openDropdown === "month"} onToggle={() => setOpenDropdown((p) => p === "month" ? null : "month")} selectedValues={draftMonths} searchValue={monthSearch} onSearchChange={setMonthSearch} onToggleValue={(v) => toggleMulti(v, setDraftMonths)} onSelectAll={() => setDraftMonths(ALL_MONTH_VALUES)} onClear={() => setDraftMonths([])} />
-                </>
-              ) : (
-                <div className="date-range-group">
-                  <input type="date" className="date-input" value={draftDateFrom} onChange={(e) => setDraftDateFrom(e.target.value)} />
-                  <span className="date-sep">→</span>
-                  <input type="date" className="date-input" value={draftDateTo} onChange={(e) => setDraftDateTo(e.target.value)} />
-                </div>
-              )}
-              <div className="comparison-group">
-                {COMPARISON_OPTIONS.map((opt) => (
-                  <button key={opt.id} type="button" className={`comparison-btn ${draftComparison === opt.id ? "active" : ""}`} onClick={() => setDraftComparison(opt.id)}>{opt.label}</button>
-                ))}
-              </div>
               <button type="button" className="btn btn-theme" onClick={() => setTheme((p) => p === "dark" ? "light" : "dark")}>{theme === "dark" ? "Oscuro" : "Claro"}</button>
-              <button type="button" className="btn btn-primary" onClick={applyFilters}>Aplicar</button>
               {auth.enabled && <button type="button" className="btn btn-muted" onClick={handleLogout}>Salir</button>}
             </div>
           </div>
           <div className="status-row">
-            {auth.enabled && <span className="status-badge live">Sesion local activa</span>}
             <span className={`status-badge ${connection.source === "mysql" ? "live" : "mock"}`}>{dataMode}</span>
             {connection.source === "mysql" && liveRangeSummary && <span className="status-badge">Rango: {liveRangeSummary}</span>}
             <span className="status-badge">Ordenes: {fNumber(filteredAll.length)}</span>
-            <span className="status-badge">PAID: {fNumber(paidOrders.length)}</span>
-            <span className="status-badge">Clientes: {fNumber(buyers.unique)}</span>
-            <span className="status-badge">Recurrencia: {recurrence.toFixed(1)}%</span>
             {connection.error && <span className="status-badge error">Error: {connection.error}</span>}
           </div>
         </header>
