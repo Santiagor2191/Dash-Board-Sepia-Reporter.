@@ -67,6 +67,11 @@ export default function Dashboard() {
   const prevOrdersCount = previousAll.length;
   const prevTicket = prevOrdersCount ? prevIngresado / prevOrdersCount : 0;
 
+  const utilidadNeta = totalRevenue - costoProducto;
+  const prevUtilidadNeta = prevRevenue - prevCostoProducto;
+  const margenPct = totalIngresado ? (utilidadNeta / totalIngresado) * 100 : 0;
+  const prevMargenPct = prevIngresado ? (prevUtilidadNeta / prevIngresado) * 100 : 0;
+
   const kpis = [
     { stripeClass: "stripe-a", label: "Ordenes Totales", value: fNumber(totalOrders), delta: calcDelta(totalOrders, prevOrdersCount) },
     { stripeClass: "stripe-b", label: "Ingresos Sepia", value: fCurrency(totalRevenue), delta: calcDelta(totalRevenue, prevRevenue) },
@@ -74,6 +79,8 @@ export default function Dashboard() {
     { stripeClass: "stripe-d", label: "Ticket Promedio", value: fCurrency(ticketAverage), delta: calcDelta(ticketAverage, prevTicket) },
     { stripeClass: "stripe-e", label: "Cargos por Venta", value: fCurrency(totalCargos), delta: calcDelta(totalCargos, prevCargos) },
     { stripeClass: "stripe-a", label: "Costo Producto", value: fCurrency(costoProducto), delta: calcDelta(costoProducto, prevCostoProducto) },
+    { stripeClass: "stripe-b", label: "Utilidad Neta", value: fCurrency(utilidadNeta), delta: calcDelta(utilidadNeta, prevUtilidadNeta) },
+    { stripeClass: "stripe-c", label: "Margen %", value: `${margenPct.toFixed(1)}%`, delta: calcDelta(margenPct, prevMargenPct) },
   ];
 
   const periodSeries = useMemo(() => {
