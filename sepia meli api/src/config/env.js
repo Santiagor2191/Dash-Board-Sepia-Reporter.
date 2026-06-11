@@ -56,6 +56,7 @@ export const SESSION_SECRET = (() => {
   );
   return crypto.randomBytes(32).toString("hex");
 })();
+export const CRON_SECRET = toTrimmedString(process.env.CRON_SECRET);
 export const MELI_CLIENT_ID = process.env.MELI_CLIENT_ID || "";
 export const MELI_CLIENT_SECRET = process.env.MELI_CLIENT_SECRET || "";
 export const MELI_REDIRECT_URI = process.env.MELI_REDIRECT_URI || "";

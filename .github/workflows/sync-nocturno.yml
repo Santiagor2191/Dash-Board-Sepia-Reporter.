@@ -1,0 +1,30 @@
+name: Sync nocturno Sepia
+
+on:
+  schedule:
+    # 3:00 AM hora Colombia (UTC-5) = 8:00 AM UTC
+    - cron: '0 8 * * *'
+  workflow_dispatch: # permite lanzar manual desde GitHub Actions
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Disparar sync en backend Render
+        run: |
+          echo "Llamando a POST /cron/sync en $(date -u)"
+          HTTP_STATUS=$(curl -s -o /tmp/response.json -w "%{http_code}" \
+            -X POST https://dashboard-sepia-inventario.onrender.com/cron/sync \
+            -H "x-cron-secret: ${{ secrets.CRON_SECRET }}" \
+            -H "Content-Type: application/json" \
+            --max-time 300)
+          echo "HTTP Status: $HTTP_STATUS"
+          echo "Respuesta:"
+          cat /tmp/response.json
+          # 200 = sync ok, 409 = ya habia un sync corriendo (no es error)
+          if [ "$HTTP_STATUS" != "200" ] && [ "$HTTP_STATUS" != "409" ]; then
+            echo "Error inesperado: HTTP $HTTP_STATUS"
+            exit 1
+          fi

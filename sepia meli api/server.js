@@ -9,6 +9,7 @@ import {
   AUTH_STATE_TTL_MS,
   DASHBOARD_ADMIN_PASSWORD,
   DASHBOARD_AUTH_ENABLED,
+  CRON_SECRET,
   FRONTEND_ORIGINS,
   HOST,
   JSON_BODY_LIMIT,
@@ -213,6 +214,28 @@ app.get("/", (req, res) => {
 });
 app.post("/notifications", (req, res) => {
   res.status(200).send("ok");
+});
+
+// POST /cron/sync — llamado por cron externo (GitHub Actions, cron-job.org, etc.)
+// Auth por header x-cron-secret; no requiere sesion del dashboard.
+app.post("/cron/sync", async (req, res) => {
+  if (!CRON_SECRET) {
+    return res.status(503).json({ ok: false, mensaje: "CRON_SECRET no configurado en el servidor" });
+  }
+  const provided = String(req.headers["x-cron-secret"] || "").trim();
+  if (!provided || provided !== CRON_SECRET) {
+    return res.status(401).json({ ok: false, mensaje: "No autorizado" });
+  }
+  try {
+    const resultado = await ejecutarSyncConLock({ daysBack: 14, maxOrders: 1000 });
+    return res.json({ ok: true, ...resultado });
+  } catch (error) {
+    if (error?.statusCode === 409) {
+      return res.status(409).json({ ok: false, mensaje: error.message });
+    }
+    console.error("[cron/sync] Error:", error.message);
+    return res.status(500).json({ ok: false, mensaje: "Error ejecutando sync" });
+  }
 });
 
 // Wrapper para correr el sync desde el cron/startup con logging y sin propagar errores
