@@ -563,6 +563,18 @@ html[data-theme="dark"] {
   font-size: 0.78rem;
 }
 
+.panel-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.btn-xs {
+  font-size: 0.75rem;
+  padding: 3px 10px;
+  border-radius: 8px;
+}
+
 .bar-chart {
   display: flex;
   align-items: flex-end;

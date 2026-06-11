@@ -5,7 +5,7 @@ import { getInventory } from "../api";
 import {
   fCurrency, fNumber, fDate, calcDelta,
   getPeriodStart, getPeriodLabel, addPeriods, getOrderTone,
-  COMPARISON_OPTIONS,
+  COMPARISON_OPTIONS, exportToCsv,
 } from "../utils";
 
 const STOCK_ALERT_CONFIG = {
@@ -174,7 +174,17 @@ export default function Dashboard() {
       </section>
 
       <section className="panel">
-        <header className="panel-head"><h2>Ultimas ordenes</h2><span>{fNumber(sortedOrders.length)} registros</span></header>
+        <header className="panel-head">
+          <h2>Ultimas ordenes</h2>
+          <div className="panel-head-actions">
+            <span>{fNumber(sortedOrders.length)} registros</span>
+            <button type="button" className="btn btn-muted btn-xs" onClick={() => exportToCsv(
+              "ordenes.csv",
+              ["Fecha", "Orden", "Producto", "QTY", "Monto COP", "Estado"],
+              sortedOrders.map((o) => [fDate(new Date(o.date)), o.id, o.item.title, o.qty, o.amount, o.status])
+            )}>↓ CSV</button>
+          </div>
+        </header>
         <div className="table-wrap">
           <table>
             <thead><tr><th>Fecha</th><th>Orden</th><th>Producto</th><th>QTY</th><th>Monto</th><th>Estado</th></tr></thead>

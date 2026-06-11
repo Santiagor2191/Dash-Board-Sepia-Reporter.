@@ -55,3 +55,19 @@ export const getOrderTone = (status) => {
   if (status === "cancelled") return "cancelled";
   return "pending";
 };
+
+// Exporta a CSV con BOM UTF-8 para que Excel abra acentos correctamente
+export const exportToCsv = (filename, headers, rows) => {
+  const escape = (val) => {
+    const s = String(val ?? "").replace(/"/g, '""');
+    return /[,"\n\r]/.test(s) ? `"${s}"` : s;
+  };
+  const lines = [headers, ...rows].map((row) => row.map(escape).join(","));
+  const blob = new Blob(["﻿" + lines.join("\n")], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+};

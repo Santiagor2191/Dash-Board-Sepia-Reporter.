@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { useOutletContext } from "react-router-dom";
 import KPI from "../components/KPI";
-import { fCurrency, fNumber, getPeriodStart, getPeriodLabel } from "../utils";
+import { fCurrency, fNumber, getPeriodStart, getPeriodLabel, exportToCsv } from "../utils";
 
 export default function Analytics() {
   const { filteredAll, appliedComparison } = useOutletContext();
@@ -55,7 +55,17 @@ export default function Analytics() {
       </section>
 
       <section className="panel">
-        <header className="panel-head"><h2>Revenue por periodo</h2><span>{fNumber(revenueSeries.length)} periodos</span></header>
+        <header className="panel-head">
+          <h2>Revenue por periodo</h2>
+          <div className="panel-head-actions">
+            <span>{fNumber(revenueSeries.length)} periodos</span>
+            <button type="button" className="btn btn-muted btn-xs" onClick={() => exportToCsv(
+              "revenue-por-periodo.csv",
+              ["Periodo", "Revenue COP", "Ordenes"],
+              revenueSeries.map((r) => [r.label, r.revenue, r.orders])
+            )}>↓ CSV</button>
+          </div>
+        </header>
         {revenueSeries.length ? (
           <div className="bar-chart">
             {revenueSeries.slice(-12).map((item) => (
@@ -70,7 +80,17 @@ export default function Analytics() {
       </section>
 
       <section className="panel">
-        <header className="panel-head"><h2>Top 10 productos</h2><span>Por revenue</span></header>
+        <header className="panel-head">
+          <h2>Top 10 productos</h2>
+          <div className="panel-head-actions">
+            <span>Por revenue</span>
+            <button type="button" className="btn btn-muted btn-xs" onClick={() => exportToCsv(
+              "top-productos.csv",
+              ["Producto", "Ordenes", "Unidades", "Revenue COP"],
+              topProducts.map((p) => [p.title, p.orders, p.qty, p.revenue])
+            )}>↓ CSV</button>
+          </div>
+        </header>
         <div className="table-wrap">
           <table>
             <thead><tr><th>Producto</th><th>Ordenes</th><th>Unidades</th><th>Revenue</th></tr></thead>

@@ -12,7 +12,7 @@ import {
   getRentabilidadPremiumVsClasica,
   getRentabilidadCostoPorVentas,
 } from "../api";
-import { fCurrency, fNumber } from "../utils";
+import { fCurrency, fNumber, exportToCsv } from "../utils";
 
 const PIE_COLORS = ["#0ea5e9", "#f59e0b", "#14b8a6", "#ef4444", "#8b5cf6", "#ec4899", "#22c55e"];
 
@@ -142,7 +142,17 @@ export default function Rentabilidad() {
 
       {/* Top 10 mas rentables */}
       <section className="panel">
-        <header className="panel-head"><h2>Top 10 Mas Rentables</h2><span>Por utilidad</span></header>
+        <header className="panel-head">
+          <h2>Top 10 Mas Rentables</h2>
+          <div className="panel-head-actions">
+            <span>Por utilidad</span>
+            <button type="button" className="btn btn-muted btn-xs" onClick={() => exportToCsv(
+              "top-rentables.csv",
+              ["ID", "Titulo", "Precio Venta COP", "Utilidad COP", "Margen %"],
+              topRentables.map((p) => [p.id_publicaciones, p.titulo, p.precio_venta_real, p.utilidad_sepia, p.margen_pct])
+            )}>↓ CSV</button>
+          </div>
+        </header>
         {topRentables.length > 0 ? (
           <div className="table-wrap">
             <table>
@@ -173,7 +183,19 @@ export default function Rentabilidad() {
 
       {/* Productos con perdida */}
       <section className="panel">
-        <header className="panel-head"><h2>Productos con Perdida</h2><span>{conPerdida.length} productos</span></header>
+        <header className="panel-head">
+          <h2>Productos con Perdida</h2>
+          <div className="panel-head-actions">
+            <span>{conPerdida.length} productos</span>
+            {conPerdida.length > 0 && (
+              <button type="button" className="btn btn-muted btn-xs" onClick={() => exportToCsv(
+                "productos-con-perdida.csv",
+                ["ID", "Titulo", "Precio Venta COP", "Costo Total COP", "Utilidad COP"],
+                conPerdida.map((p) => [p.id_publicaciones, p.titulo, p.precio_venta_real, p.costo_total, p.utilidad_sepia])
+              )}>↓ CSV</button>
+            )}
+          </div>
+        </header>
         {conPerdida.length > 0 ? (
           <div className="table-wrap">
             <table>
