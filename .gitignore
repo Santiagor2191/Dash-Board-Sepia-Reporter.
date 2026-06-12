@@ -21,3 +21,9 @@ data/**/*.xlsx
 data/**/*.xls
 *.dump
 *.sql.gz
+
+# Local Netlify folder
+.netlify
+
+# gstack local artifacts (security reports, analytics, learnings)
+.gstack/

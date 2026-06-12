@@ -5,7 +5,7 @@ import { fCurrency, fNumber } from "../utils";
 import { getAdsMetrics, getAdsDiagnose, getStatus, redirectToMercadoLibreAuth } from "../api";
 
 export default function Publicidad() {
-  const { filteredAll, connection } = useOutletContext();
+  const { filteredAll } = useOutletContext();
   
   const [adsData, setAdsData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -53,7 +53,6 @@ export default function Publicidad() {
   const totalSpend = adsData?.summary?.spend || 0;
   const adsRevenue = adsData?.summary?.revenue || 0;
   const totalClicks = adsData?.summary?.clicks || adsData?.campaigns?.reduce((sum, camp) => sum + (camp.clicks || 0), 0) || 0;
-  const totalImpressions = adsData?.summary?.impressions || adsData?.campaigns?.reduce((sum, camp) => sum + (camp.impressions || 0), 0) || 0;
 
   // ROAS Global de la Tienda (Todas las Ventas vs Gasto Publicitario)
   const globalRoas = totalSpend > 0 ? (storeRevenue / totalSpend) : 0;

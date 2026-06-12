@@ -238,16 +238,6 @@ export default function App() {
     });
   }, [ordersSource, appliedFilterMode, appliedYears, appliedMonths, appliedDateFrom, appliedDateTo, allYears]);
 
-  const paidOrders = useMemo(() => filteredAll.filter((o) => o.status === "paid"), [filteredAll]);
-
-  const buyers = useMemo(() => {
-    const map = {};
-    paidOrders.forEach((o) => { const k = String(o.buyer); map[k] = (map[k] || 0) + 1; });
-    return { unique: Object.keys(map).length, repeat: Object.values(map).filter((v) => v >= 2).length };
-  }, [paidOrders]);
-
-  const recurrence = buyers.unique ? (buyers.repeat / buyers.unique) * 100 : 0;
-
   const liveRangeSummary = useMemo(() => {
     if (!ordersSource.length) return null;
     const dates = ordersSource.map((o) => new Date(o.date)).sort((a, b) => a - b);

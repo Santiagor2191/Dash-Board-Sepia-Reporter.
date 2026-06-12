@@ -3,6 +3,7 @@ import cors from "cors";
 import helmet from "helmet";
 import rateLimit from "express-rate-limit";
 import cron from "node-cron";
+import crypto from "crypto";
 import {
   API_RATE_LIMIT_MAX_REQUESTS,
   API_RATE_LIMIT_WINDOW_MS,
@@ -223,7 +224,9 @@ app.post("/cron/sync", async (req, res) => {
     return res.status(503).json({ ok: false, mensaje: "CRON_SECRET no configurado en el servidor" });
   }
   const provided = String(req.headers["x-cron-secret"] || "").trim();
-  if (!provided || provided !== CRON_SECRET) {
+  const secretsMatch = provided.length === CRON_SECRET.length &&
+    crypto.timingSafeEqual(Buffer.from(provided), Buffer.from(CRON_SECRET));
+  if (!provided || !secretsMatch) {
     return res.status(401).json({ ok: false, mensaje: "No autorizado" });
   }
   try {

@@ -1,4 +1,4 @@
-import { useMemo, useEffect, useState } from "react";
+import { useMemo, useCallback, useEffect, useState } from "react";
 import { useOutletContext } from "react-router-dom";
 import KPI from "../components/KPI";
 import { getInventory } from "../api";
@@ -82,20 +82,21 @@ export default function Dashboard() {
   const totalCargos = filteredAll.reduce((s, o) => s + (o.cargosVenta || 0), 0);
   const ticketAverage = totalOrders ? totalIngresado / totalOrders : 0;
 
-  const getCosto = (o) =>
-    costosMap?.[o.item.id] ?? costosTitleMap?.[normalizeTitle(o.item.title)] ?? 0;
+  const getCosto = useCallback((o) =>
+    costosMap?.[o.item.id] ?? costosTitleMap?.[normalizeTitle(o.item.title)] ?? 0,
+  [costosMap, costosTitleMap]);
 
   const costoProducto = useMemo(() => {
     let total = 0;
     for (const o of filteredAll) total += getCosto(o) * o.qty;
     return total;
-  }, [filteredAll, costosMap, costosTitleMap]);
+  }, [filteredAll, getCosto]);
 
   const prevCostoProducto = useMemo(() => {
     let total = 0;
     for (const o of previousAll) total += getCosto(o) * o.qty;
     return total;
-  }, [previousAll, costosMap, costosTitleMap]);
+  }, [previousAll, getCosto]);
 
   const prevRevenue = previousAll.reduce((s, o) => s + o.amount, 0);
   const prevIngresado = previousAll.reduce((s, o) => s + (o.paidAmount || 0), 0);

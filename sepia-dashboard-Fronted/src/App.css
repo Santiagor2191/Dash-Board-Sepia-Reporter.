@@ -237,13 +237,23 @@ body {
   border-radius: 10px;
 }
 
+.sidebar-filters .dropdown {
+  width: 100%;
+}
+
 .sidebar-filters .dropdown-trigger {
   width: 100%;
   min-width: unset;
+  display: flex;
+  box-sizing: border-box;
 }
 
-.sidebar-filters .dropdown {
+.sidebar-filters .dropdown-menu {
   width: 100%;
+  max-width: 100%;
+  left: 0;
+  right: 0;
+  box-sizing: border-box;
 }
 
 .chip {
