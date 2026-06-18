@@ -46,6 +46,9 @@ const request = async (path, options = {}) => {
   const response = await fetch(`${API_BASE_URL}${path}`, {
     ...options,
     credentials: "include",
+    // Siempre datos frescos: sin esto el navegador cachea las respuestas GET
+    // (el backend no manda cabeceras anti-cache) y muestra datos viejos.
+    cache: "no-store",
     headers,
   });
   const payload = await response.json().catch(() => ({}));
