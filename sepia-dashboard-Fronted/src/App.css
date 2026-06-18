@@ -14,8 +14,10 @@
   --accent-b: #b36830;
   --accent-c: #f59e0b;
   --glass: rgba(255, 255, 255, 0.54);
-  --glass-strong: rgba(255, 255, 255, 0.9);
-  --glass-border: rgba(148, 163, 184, 0.3);
+  --glass-strong: rgba(255, 255, 255, 0.72);
+  --glass-border: rgba(255, 255, 255, 0.5);
+  /* sheen: filo de luz arriba del vidrio, le da volumen */
+  --glass-sheen: inset 0 1px 0 rgba(255, 255, 255, 0.65);
   --sidebar-w: 280px;
   --sidebar-collapsed-w: 92px;
 }
@@ -35,12 +37,18 @@ html[data-theme="dark"] {
   --accent-b: #c47848;
   --accent-c: #f59e0b;
   --glass: rgba(19, 29, 48, 0.8);
-  --glass-strong: rgba(19, 29, 48, 0.95);
-  --glass-border: rgba(148, 163, 184, 0.18);
+  --glass-strong: rgba(19, 29, 48, 0.62);
+  --glass-border: rgba(148, 163, 184, 0.22);
+  --glass-sheen: inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
 body {
   background: var(--bg);
+  /* ponytail: blobs cobrizos sutiles para que el glass tenga algo que difuminar */
+  background-image:
+    radial-gradient(40rem 40rem at 12% -8%, var(--accent-muted), transparent 60%),
+    radial-gradient(36rem 36rem at 105% 8%, rgba(148, 163, 184, 0.16), transparent 55%);
+  background-attachment: fixed;
   color: var(--text);
 }
 
@@ -540,16 +548,19 @@ body {
 }
 
 .kpi-card {
-  border: 1px solid var(--line);
+  border: 1px solid var(--glass-border);
   border-radius: 16px;
-  background: var(--surface);
-  box-shadow: var(--shadow);
+  background: var(--glass-strong);
+  backdrop-filter: blur(16px) saturate(150%);
+  -webkit-backdrop-filter: blur(16px) saturate(150%);
+  box-shadow: var(--shadow), var(--glass-sheen);
   padding: 18px;
-  transition: box-shadow 0.2s ease;
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
 }
 
 .kpi-card:hover {
-  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.12);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 28px rgba(15, 23, 42, 0.14), var(--glass-sheen);
 }
 
 .kpi-label {
@@ -581,9 +592,11 @@ body {
 
 .panel {
   border-radius: 16px;
-  border: 1px solid var(--line);
-  background: var(--surface);
-  box-shadow: var(--shadow);
+  border: 1px solid var(--glass-border);
+  background: var(--glass-strong);
+  backdrop-filter: blur(16px) saturate(150%);
+  -webkit-backdrop-filter: blur(16px) saturate(150%);
+  box-shadow: var(--shadow), var(--glass-sheen);
   padding: 16px;
 }
 

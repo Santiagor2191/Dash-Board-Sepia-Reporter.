@@ -3,9 +3,9 @@ import { useOutletContext } from "react-router-dom";
 import KPI from "../components/KPI";
 import { getInventory } from "../api";
 import {
-  fCurrency, fNumber, fDate, calcDelta,
-  getPeriodStart, getPeriodLabel, addPeriods, getOrderTone,
-  COMPARISON_OPTIONS, exportToCsv,
+  fCurrency, fNumber, calcDelta,
+  getPeriodStart, getPeriodLabel, addPeriods,
+  COMPARISON_OPTIONS, exportToCsv, isRealProduct,
 } from "../utils";
 
 const STOCK_ALERT_CONFIG = {
@@ -55,8 +55,6 @@ export default function Dashboard() {
     return () => { cancelled = true; };
   }, []);
 
-  const sortedOrders = useMemo(() => [...filteredAll].sort((a, b) => new Date(b.date) - new Date(a.date)), [filteredAll]);
-
   const comparisonPeriods = useMemo(() => {
     const periods = new Map();
     filteredAll.forEach((order) => {
@@ -77,6 +75,7 @@ export default function Dashboard() {
   }, [ordersSource, previousPeriodKeys, appliedComparison]);
 
   const totalOrders = filteredAll.length;
+  const totalUnits = filteredAll.reduce((s, o) => s + (o.qty || 0), 0);
   const totalRevenue = filteredAll.reduce((s, o) => s + o.amount, 0);
   const totalIngresado = filteredAll.reduce((s, o) => s + (o.paidAmount || 0), 0);
   const totalCargos = filteredAll.reduce((s, o) => s + (o.cargosVenta || 0), 0);
@@ -102,22 +101,21 @@ export default function Dashboard() {
   const prevIngresado = previousAll.reduce((s, o) => s + (o.paidAmount || 0), 0);
   const prevCargos = previousAll.reduce((s, o) => s + (o.cargosVenta || 0), 0);
   const prevOrdersCount = previousAll.length;
+  const prevUnits = previousAll.reduce((s, o) => s + (o.qty || 0), 0);
   const prevTicket = prevOrdersCount ? prevIngresado / prevOrdersCount : 0;
 
   const utilidadNeta = totalRevenue - costoProducto;
   const prevUtilidadNeta = prevRevenue - prevCostoProducto;
-  const margenPct = totalIngresado ? (utilidadNeta / totalIngresado) * 100 : 0;
-  const prevMargenPct = prevIngresado ? (prevUtilidadNeta / prevIngresado) * 100 : 0;
 
   const kpis = [
-    { stripeClass: "stripe-a", label: "Ordenes Totales", value: fNumber(totalOrders), delta: calcDelta(totalOrders, prevOrdersCount) },
-    { stripeClass: "stripe-b", label: "Ingresos Sepia", value: fCurrency(totalRevenue), delta: calcDelta(totalRevenue, prevRevenue) },
     { stripeClass: "stripe-c", label: "Precio de Venta", value: fCurrency(totalIngresado), delta: calcDelta(totalIngresado, prevIngresado) },
-    { stripeClass: "stripe-d", label: "Ticket Promedio", value: fCurrency(ticketAverage), delta: calcDelta(ticketAverage, prevTicket) },
+    { stripeClass: "stripe-b", label: "Ingresos Sepia", value: fCurrency(totalRevenue), delta: calcDelta(totalRevenue, prevRevenue) },
     { stripeClass: "stripe-e", label: "Cargos por Venta", value: fCurrency(totalCargos), delta: calcDelta(totalCargos, prevCargos) },
     { stripeClass: "stripe-a", label: "Costo Producto", value: fCurrency(costoProducto), delta: calcDelta(costoProducto, prevCostoProducto) },
     { stripeClass: "stripe-b", label: "Utilidad Neta", value: fCurrency(utilidadNeta), delta: calcDelta(utilidadNeta, prevUtilidadNeta) },
-    { stripeClass: "stripe-c", label: "Margen %", value: `${margenPct.toFixed(1)}%`, delta: calcDelta(margenPct, prevMargenPct) },
+    { stripeClass: "stripe-a", label: "Ordenes Totales", value: fNumber(totalOrders), delta: calcDelta(totalOrders, prevOrdersCount) },
+    { stripeClass: "stripe-d", label: "Unidades Vendidas", value: fNumber(totalUnits), delta: calcDelta(totalUnits, prevUnits) },
+    { stripeClass: "stripe-d", label: "Ticket Promedio", value: fCurrency(ticketAverage), delta: calcDelta(ticketAverage, prevTicket) },
   ];
 
   const periodSeries = useMemo(() => {
@@ -145,6 +143,18 @@ export default function Dashboard() {
     return Object.values(map).sort((a, b) => b.revenue - a.revenue).slice(0, 6);
   }, [filteredAll]);
   const maxCatRevenue = Math.max(...categorySeries.map((c) => c.revenue), 1);
+
+  const topProductos = useMemo(() => {
+    const map = {};
+    filteredAll.forEach((o) => {
+      const name = o.item.title;
+      if (!isRealProduct(name)) return;
+      if (!map[name]) map[name] = { producto: name, unidades: 0, revenue: 0 };
+      map[name].unidades += o.qty || 0;
+      map[name].revenue += o.amount || 0;
+    });
+    return Object.values(map).sort((a, b) => b.unidades - a.unidades).slice(0, 15);
+  }, [filteredAll]);
 
   return (
     <>
@@ -183,31 +193,29 @@ export default function Dashboard() {
 
       <section className="panel">
         <header className="panel-head">
-          <h2>Ultimas ordenes</h2>
+          <h2>Productos más vendidos</h2>
           <div className="panel-head-actions">
-            <span>{fNumber(sortedOrders.length)} registros</span>
+            <span>Top {topProductos.length} por unidades</span>
             <button type="button" className="btn btn-muted btn-xs" onClick={() => exportToCsv(
-              "ordenes.csv",
-              ["Fecha", "Orden", "Producto", "QTY", "Monto COP", "Estado"],
-              sortedOrders.map((o) => [fDate(new Date(o.date)), o.id, o.item.title, o.qty, o.amount, o.status])
+              "productos-top.csv",
+              ["#", "Producto", "Unidades", "Ventas COP"],
+              topProductos.map((p, i) => [i + 1, p.producto, p.unidades, p.revenue])
             )}>↓ CSV</button>
           </div>
         </header>
         <div className="table-wrap">
           <table>
-            <thead><tr><th>Fecha</th><th>Orden</th><th>Producto</th><th>QTY</th><th>Monto</th><th>Estado</th></tr></thead>
+            <thead><tr><th>#</th><th>Producto</th><th>Unidades</th><th>Ventas</th></tr></thead>
             <tbody>
-              {sortedOrders.length ? sortedOrders.slice(0, 30).map((order) => (
-                <tr key={`${order.id}-${order.date}`}>
-                  <td>{fDate(new Date(order.date))}</td>
-                  <td>#{String(order.id).slice(-6)}</td>
-                  <td>{order.item.title}</td>
-                  <td>{order.qty}</td>
-                  <td>{fCurrency(order.amount)}</td>
-                  <td><span className={`pill ${getOrderTone(order.status)}`}>{order.status.toUpperCase()}</span></td>
+              {topProductos.length ? topProductos.map((p, i) => (
+                <tr key={p.producto}>
+                  <td>{i + 1}</td>
+                  <td>{p.producto}</td>
+                  <td>{fNumber(p.unidades)}</td>
+                  <td>{fCurrency(p.revenue)}</td>
                 </tr>
               )) : (
-                <tr><td colSpan="6" className="table-empty">No hay ordenes para mostrar con los filtros actuales.</td></tr>
+                <tr><td colSpan="4" className="table-empty">No hay productos para mostrar con los filtros actuales.</td></tr>
               )}
             </tbody>
           </table>

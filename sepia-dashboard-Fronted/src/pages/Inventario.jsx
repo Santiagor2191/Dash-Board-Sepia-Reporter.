@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo } from "react";
 import { getStatus, getInventory, redirectToMercadoLibreAuth } from "../api";
-import { fCurrency, fNumber } from "../utils";
+import { fCurrency, fNumber, exportToCsv } from "../utils";
 
 const ALERT_CONFIG = {
   sin_stock:  { label: "Sin stock",     color: "#ef4444", bg: "rgba(239,68,68,0.12)" },
@@ -39,6 +39,7 @@ export default function Inventario() {
   const [filter, setFilter] = useState("all");
   const [sortBy, setSortBy] = useState("alert");
   const [search, setSearch] = useState("");
+  const [coverageDays, setCoverageDays] = useState(30);
 
   const fetchData = async (force = false) => {
     setLoading(true);
@@ -85,6 +86,24 @@ export default function Inventario() {
       avgDays: avgDaysVal,
     };
   }, [items]);
+
+  // Reposición sugerida: qué comprar para cubrir `coverageDays` días de venta.
+  // Solo productos activos que se venden (velocidad > 0) y a los que no les alcanza el stock.
+  const reposicion = useMemo(() => {
+    return items
+      .filter((i) => i.status === "active" && i.daily_velocity > 0)
+      .map((i) => ({
+        ...i,
+        sugerido: Math.max(0, Math.round(i.daily_velocity * coverageDays) - i.available_quantity),
+      }))
+      .filter((i) => i.sugerido > 0)
+      .sort((a, b) => a.days_of_stock - b.days_of_stock);
+  }, [items, coverageDays]);
+
+  const totalUnidadesReponer = useMemo(
+    () => reposicion.reduce((s, i) => s + i.sugerido, 0),
+    [reposicion],
+  );
 
   // Filtered & sorted list
   const displayed = useMemo(() => {
@@ -233,6 +252,73 @@ export default function Inventario() {
           </span>
         </div>
       )}
+
+      {/* Reposición sugerida */}
+      <section className="panel">
+        <header className="panel-head">
+          <h2>Reposición sugerida</h2>
+          <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+            <span style={{ color: "var(--muted)", fontSize: "0.78rem" }}>Cobertura:</span>
+            <select
+              value={coverageDays}
+              onChange={(e) => setCoverageDays(Number(e.target.value))}
+              className="dropdown-trigger"
+              style={{ minWidth: 90 }}
+            >
+              <option value={30}>30 días</option>
+              <option value={45}>45 días</option>
+              <option value={60}>60 días</option>
+            </select>
+            {reposicion.length > 0 && (
+              <button className="btn btn-muted btn-xs" onClick={() => exportToCsv(
+                "reposicion.csv",
+                ["Producto", "SKU", "Stock actual", "Vel/dia", "Dias restantes", "Comprar"],
+                reposicion.map((i) => [i.title, i.seller_sku || i.id, i.available_quantity, i.daily_velocity.toFixed(1), i.days_of_stock >= 999 ? "" : i.days_of_stock, i.sugerido])
+              )}>↓ Lista de compra</button>
+            )}
+          </div>
+        </header>
+        <p style={{ color: "var(--muted)", fontSize: "0.82rem", margin: "0 0 12px" }}>
+          Productos que se quedan sin stock antes de {coverageDays} días según su velocidad de venta. La columna <strong>Comprar</strong> es cuánto reponer para cubrir ese periodo.
+        </p>
+        {reposicion.length ? (
+          <>
+            <div style={{ marginBottom: 12 }}>
+              <strong>{reposicion.length}</strong> producto{reposicion.length !== 1 ? "s" : ""} para reponer · <strong>{fNumber(totalUnidadesReponer)}</strong> unidades en total
+            </div>
+            <div className="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Producto</th>
+                    <th>SKU</th>
+                    <th style={{ textAlign: "center" }}>Stock</th>
+                    <th style={{ textAlign: "center" }}>Vel/día</th>
+                    <th style={{ textAlign: "center" }}>Días restantes</th>
+                    <th style={{ textAlign: "center" }}>Comprar</th>
+                    <th>Link</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {reposicion.map((item) => (
+                    <tr key={item.id} style={{ background: item.days_of_stock <= 7 ? "rgba(239,68,68,0.05)" : undefined }}>
+                      <td style={{ maxWidth: 260, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.title}</td>
+                      <td style={{ color: "var(--muted)", fontSize: "0.78rem" }}>{item.seller_sku || item.id}</td>
+                      <td style={{ textAlign: "center", fontWeight: 700, color: item.available_quantity === 0 ? "#ef4444" : undefined }}>{fNumber(item.available_quantity)}</td>
+                      <td style={{ textAlign: "center", color: "var(--muted)" }}>{item.daily_velocity.toFixed(1)}</td>
+                      <td style={{ textAlign: "center", fontWeight: 700, color: item.days_of_stock <= 7 ? "#ef4444" : item.days_of_stock <= 15 ? "#f97316" : "#f59e0b" }}>{item.days_of_stock >= 999 ? "---" : item.days_of_stock}</td>
+                      <td style={{ textAlign: "center", fontWeight: 800, color: "var(--accent)" }}>+{fNumber(item.sugerido)}</td>
+                      <td>{item.permalink && <a href={item.permalink} target="_blank" rel="noopener noreferrer" style={{ color: "var(--accent-a)", fontSize: "0.78rem" }}>Ver</a>}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
+        ) : (
+          <div className="empty-state">Nada urgente: ningún producto se queda sin stock en los próximos {coverageDays} días. 👍</div>
+        )}
+      </section>
 
       {/* Filters & Controls */}
       <section className="panel">

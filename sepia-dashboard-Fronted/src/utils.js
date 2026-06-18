@@ -50,6 +50,18 @@ export const calcDelta = (currentValue, previousValue) => {
   return ((currentValue - previousValue) / previousValue) * 100;
 };
 
+// MeLi guarda los pedidos de varios productos como UN solo renglón "Paquete de N
+// productos" (sin desglose) y a veces sin nombre. Esa plata SÍ cuenta en los totales,
+// pero no son productos reales y ensucian el ranking — se excluyen solo de los rankings.
+export const isRealProduct = (title) => {
+  const t = (title || "").trim().toLowerCase();
+  if (!t || t === "producto sin nombre") return false;
+  if (/^paquete de \d+ productos$/.test(t)) return false; // "Paquete de 2 productos"
+  if (/^\d+\s+paquetes?$/.test(t)) return false;          // "1 paquete", "2 paquetes"
+  if (/^paquetes?(\s+\d+)?$/.test(t)) return false;       // "Paquete", "Paquete 2"
+  return true;
+};
+
 export const getOrderTone = (status) => {
   if (status === "paid") return "paid";
   if (status === "cancelled") return "cancelled";

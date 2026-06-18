@@ -1,3 +1,30 @@
+// MeLi guarda las localidades de Bogotá como si fueran ciudades. Las agrupamos
+// como "Bogotá". Lista en minúsculas (se compara con lower(ciudad)). Incluye
+// variantes con/sin tilde y formas observadas en los datos.
+const BOGOTA_LOCALIDADES = [
+  "bogotá", "bogota", "bogotá d.c.", "bogota d.c.", "bogotá d.c", "bogota dc", "bogotá dc",
+  "usaquén", "usaquen",
+  "chapinero",
+  "santa fe", "santafé", "santa fé",
+  "san cristóbal", "san cristobal", "san cristóbal sur", "san cristobal sur",
+  "usme",
+  "tunjuelito",
+  "bosa",
+  "kennedy",
+  "fontibón", "fontibon",
+  "engativá", "engativa",
+  "suba",
+  "barrios unidos",
+  "teusaquillo",
+  "los mártires", "los martires", "mártires", "martires",
+  "antonio nariño", "antonio narino",
+  "puente aranda",
+  "la candelaria", "candelaria",
+  "rafael uribe uribe", "rafael uribe",
+  "ciudad bolívar", "ciudad bolivar",
+  "sumapaz",
+];
+
 const inferCategoryFromProduct = (producto) => {
   if (!producto) return "General";
   const p = producto.toLowerCase();
@@ -214,19 +241,24 @@ export const createHistoricalSalesService = ({ dbPool }) => {
         LIMIT 10
       `),
 
-      // 5. Ciudades rentables — porcentaje calculado en SQL con window function
+      // 5. Ciudades rentables — agrupa localidades de Bogotá en "Bogotá".
       dbPool.query(`
+        WITH v AS (
+          SELECT CASE WHEN lower(trim(ciudad)) = ANY($1) THEN 'Bogotá' ELSE trim(ciudad) END AS ciudad,
+                 monto_reportado_cop
+          FROM ventas_ml
+          WHERE ciudad IS NOT NULL AND trim(ciudad) != ''
+        )
         SELECT ciudad,
                SUM(monto_reportado_cop)                                       AS revenue,
                COUNT(*)                                                       AS ordenes,
                ROUND(SUM(monto_reportado_cop) * 100.0
                      / NULLIF(SUM(SUM(monto_reportado_cop)) OVER (), 0), 2)  AS porcentaje
-        FROM ventas_ml
-        WHERE ciudad IS NOT NULL AND ciudad != ''
+        FROM v
         GROUP BY ciudad
         ORDER BY revenue DESC
         LIMIT 10
-      `),
+      `, [BOGOTA_LOCALIDADES]),
 
       // 6. Ticket por categoria
       dbPool.query(`
