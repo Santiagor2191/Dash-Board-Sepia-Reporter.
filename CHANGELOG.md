@@ -13,6 +13,16 @@
 ### Rankings de productos
 - "Top productos" (Analytics) y "Productos más vendidos" (Dashboard) excluyen wrappers genéricos sin desglose ("Paquete de N productos", "1 paquete", "Paquete 2", filas sin nombre). Su plata sigue contando en los totales; solo se ocultan del ranking. Helper `isRealProduct` en `utils.js`.
 
+### Meta Ads
+- Extractor reescrito (`scripts/carga_ventas_meta_ads.py`): la serie mensual de Meta Ads se calcula desde la hoja **"Datos clientes"** + **"Data publicidad"** del Excel (antes leía una hoja que ya no existe). Coincide con las tablas dinámicas. 25 meses (jun 2024–jun 2026) cargados a `ventas_meta_ads_mensual`. Nota: "Costo producto" ya es total de línea (no se multiplica por cantidad).
+
+### Bugs de producción (post-deploy)
+- **Zona horaria (crítico)**: `getVentas` armaba la fecha según la zona del servidor. Render corre en UTC → las ventas del día 1 (medianoche Colombia) salían como mes anterior e inflaban los totales (~$94k en "Ene–May 2026"). Fix: fecha desde `anio/num_mes/dia` a mediodía UTC, estable en cualquier zona.
+- **Caché del navegador**: las peticiones GET no desactivaban caché → el dashboard mostraba datos viejos aun recargando. Fix: `cache: "no-store"` en `api.js`.
+
+### Despliegue
+- Publicado a producción: frontend (Netlify) + backend (Render). Verificado: 2026 Ene–May cuadra al peso con el Excel ($35.667.243).
+
 ## 2026-06-17
 
 ### Apariencia
