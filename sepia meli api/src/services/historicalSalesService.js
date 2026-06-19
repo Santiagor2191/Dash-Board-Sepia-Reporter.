@@ -95,9 +95,13 @@ export const createHistoricalSalesService = ({ dbPool }) => {
       const qty = row.cantidad === null || row.cantidad === undefined
         ? 0
         : Number(row.cantidad) || 0;
-      const date = row.fecha
-        ? new Date(row.fecha).toISOString()
-        : new Date(row.anio, (row.num_mes || 1) - 1, row.dia || 1).toISOString();
+      // Fecha a partir de las columnas anio/num_mes/dia (hora Colombia) fijada a
+      // mediodía UTC: así el mes/año es estable sin importar la zona horaria del
+      // servidor (Render corre en UTC y desplazaba las ventas del día 1 al mes
+      // anterior). Fallback a fecha si faltan las partes.
+      const date = (row.anio && row.num_mes && row.dia)
+        ? new Date(Date.UTC(Number(row.anio), Number(row.num_mes) - 1, Number(row.dia), 12, 0, 0)).toISOString()
+        : (row.fecha ? new Date(row.fecha).toISOString() : new Date().toISOString());
 
       const amount = Number(row.monto_reportado_cop) || 0;
       const paidAmount = Number(row.ingresos_productos_cop) || amount;
