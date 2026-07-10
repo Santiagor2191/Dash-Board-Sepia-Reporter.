@@ -91,6 +91,7 @@ export const getDbResumen = () => request("/db/resumen");
 export const getInteligencia = () => request("/db/inteligencia");
 export const getClientesContabilidadDashboard = () => request("/db/clientes-contabilidad");
 export const getVentasMetaAdsDashboard = () => request("/db/ventas-meta-ads");
+export const getMetaAdsLive = () => request("/db/meta-ads-live");
 export const getInventory = (force = false) =>
   request(`/meli/inventory${force ? "?force=true" : ""}`);
 export const getConversion = (force = false) =>

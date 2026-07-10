@@ -1,5 +1,13 @@
 # Changelog — Dashboard Sepia BI
 
+## 2026-07-10
+
+### Meta Ads — métricas en vivo
+- Nueva sección **"Campañas Meta en vivo"** en Ventas Meta Ads: gasto, conversaciones de WhatsApp, costo por conversación, pedidos, costo por pedido y CTR de los últimos 30 días, por anuncio, leídos directo de la API de Meta (Graph v23.0). Servicio nuevo `metaAdsLiveService.js` + endpoint `GET /db/meta-ads-live` (sesión requerida, cache 15 min).
+- Nueva sección **"Recomendaciones de la IA de Meta"**: sugerencias que Meta genera para campañas y conjuntos activos.
+- **Alerta de presupuesto desalineado**: si un anuncio concentra >40% del gasto con costo por pedido >2x el mejor, el dashboard lo marca (Meta reparte plata hacia el CPM barato, no hacia el que más vende).
+- Config: `META_ACCESS_TOKEN` y `META_AD_ACCOUNT_ID` en el `.env` del backend (y en Render para producción). El token de usuario extendido dura ~60 días; al vencer, la sección lo avisa con mensaje claro.
+
 ## 2026-06-18
 
 ### Datos / confiabilidad

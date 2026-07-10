@@ -12,7 +12,7 @@ import {
   YAxis,
 } from "recharts";
 import KPI from "../components/KPI";
-import { getClientesContabilidadDashboard } from "../api";
+import { getClientesContabilidadDashboard, getMetaAdsLive } from "../api";
 import { calcDelta, fCurrency, fNumber, MONTHS, ALL_MONTH_VALUES } from "../utils";
 
 const MONTH_SHORT = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
@@ -362,6 +362,8 @@ export default function VentasMetaAds() {
 
   return (
     <>
+      <MetaAdsLiveSection />
+
       <section className="panel filter-panel">
         <CompactFilterRow
           label="Años"
@@ -593,6 +595,180 @@ export default function VentasMetaAds() {
           </section>
         </>
       )}
+    </>
+  );
+}
+
+// Sección "en vivo": métricas reales de la cuenta publicitaria (API de Meta, últimos 30 días)
+// + recomendaciones generadas por la propia IA de Meta. Independiente de los filtros del Excel.
+function MetaAdsLiveSection() {
+  const [live, setLive] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    getMetaAdsLive()
+      .then((payload) => { if (!cancelled) setLive(payload); })
+      .catch((err) => { if (!cancelled) setLive({ error: err?.message || "No se pudo consultar Meta." }); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, []);
+
+  const anuncios = useMemo(() => {
+    const rows = Array.isArray(live?.anuncios) ? [...live.anuncios] : [];
+    // Mejor costo por pedido primero; sin pedidos al final
+    rows.sort((a, b) => (a.costo_pedido ?? Infinity) - (b.costo_pedido ?? Infinity));
+    return rows;
+  }, [live]);
+
+  if (loading) {
+    return <section className="panel"><div className="empty-state" style={{ padding: 16 }}>Consultando campañas en Meta...</div></section>;
+  }
+  if (!live) return null;
+
+  if (live.configured === false || live.error) {
+    return (
+      <section className="panel">
+        <header className="panel-head">
+          <h2>Campañas Meta en vivo</h2>
+          <span>API de Meta · últimos 30 días</span>
+        </header>
+        <div className="empty-state" style={{ padding: 16 }}>{live.mensaje || live.error}</div>
+      </section>
+    );
+  }
+
+  const totalGasto = anuncios.reduce((acc, a) => acc + a.gasto, 0);
+  const totalConv = anuncios.reduce((acc, a) => acc + a.conversaciones, 0);
+  const totalPedidos = anuncios.reduce((acc, a) => acc + a.pedidos, 0);
+  const totalClicks = anuncios.reduce((acc, a) => acc + a.clicks, 0);
+  const totalImpresiones = anuncios.reduce((acc, a) => acc + a.impresiones, 0);
+
+  const kpisLive = [
+    { label: "Gasto (30 días)", value: fCurrency(totalGasto) },
+    { label: "Conversaciones", value: fNumber(totalConv) },
+    { label: "Costo x Conversación", value: totalConv > 0 ? fCurrency(totalGasto / totalConv) : "—" },
+    { label: "Pedidos", value: fNumber(totalPedidos) },
+    { label: "Costo x Pedido", value: totalPedidos > 0 ? fCurrency(totalGasto / totalPedidos) : "—" },
+    { label: "CTR promedio", value: totalImpresiones > 0 ? `${((totalClicks / totalImpresiones) * 100).toFixed(2)}%` : "—" },
+  ].map((kpi) => ({ ...kpi, deltaText: "Últimos 30 días" }));
+
+  // Alerta: Meta reparte presupuesto hacia el CPM barato, no hacia el que más cierra.
+  // Señal: un anuncio concentra >40% del gasto con costo/pedido >2x el mejor del grupo.
+  const mejor = anuncios.find((a) => a.costo_pedido != null);
+  const desalineado = mejor
+    ? anuncios.find((a) =>
+        totalGasto > 0 &&
+        a.gasto / totalGasto > 0.4 &&
+        a.ad_id !== mejor.ad_id &&
+        (a.costo_pedido == null || a.costo_pedido > mejor.costo_pedido * 2))
+    : null;
+
+  const recomendaciones = Array.isArray(live.recomendaciones) ? live.recomendaciones : [];
+
+  return (
+    <>
+      <section className="panel">
+        <header className="panel-head">
+          <div>
+            <h2>Campañas Meta en vivo</h2>
+            <span style={{ color: "var(--muted)", fontSize: "0.78rem" }}>
+              API de Meta · últimos 30 días · campañas Click-to-WhatsApp
+            </span>
+          </div>
+        </header>
+
+        <section className="kpi-grid" style={{ marginBottom: 16 }}>
+          {kpisLive.map((kpi) => <KPI key={kpi.label} {...kpi} />)}
+        </section>
+
+        {desalineado && (
+          <div
+            className="empty-state"
+            style={{
+              padding: 14,
+              marginBottom: 14,
+              border: "1px solid #f59e0b",
+              borderRadius: 12,
+              color: "var(--text)",
+            }}
+          >
+            ⚠️ <strong>{desalineado.anuncio}</strong> concentra el{" "}
+            {((desalineado.gasto / totalGasto) * 100).toFixed(0)}% del gasto pero su costo por pedido
+            {" "}es {desalineado.costo_pedido == null ? "indefinido (0 pedidos)" : `${fCurrency(desalineado.costo_pedido)}`},
+            {" "}mucho peor que <strong>{mejor.anuncio}</strong> ({fCurrency(mejor.costo_pedido)}).
+            {" "}Meta reparte el presupuesto hacia el CPM barato, no hacia el que más vende — considera pausar el anuncio ineficiente.
+          </div>
+        )}
+
+        {anuncios.length ? (
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Anuncio</th>
+                  <th style={{ textAlign: "right" }}>% Gasto</th>
+                  <th style={{ textAlign: "right" }}>Gasto</th>
+                  <th style={{ textAlign: "right" }}>CTR</th>
+                  <th style={{ textAlign: "right" }}>Frecuencia</th>
+                  <th style={{ textAlign: "right" }}>Conversaciones</th>
+                  <th style={{ textAlign: "right" }}>Costo x Conv.</th>
+                  <th style={{ textAlign: "right" }}>Pedidos</th>
+                  <th style={{ textAlign: "right" }}>Costo x Pedido</th>
+                </tr>
+              </thead>
+              <tbody>
+                {anuncios.map((a) => (
+                  <tr key={a.ad_id}>
+                    <td>
+                      {a.anuncio}
+                      <div style={{ color: "var(--muted)", fontSize: "0.72rem" }}>{a.campana}</div>
+                    </td>
+                    <td style={{ textAlign: "right" }}>
+                      {totalGasto > 0 ? `${((a.gasto / totalGasto) * 100).toFixed(1)}%` : "—"}
+                    </td>
+                    <td style={{ textAlign: "right" }}>{fCurrency(a.gasto)}</td>
+                    <td style={{ textAlign: "right" }}>{`${Number(a.ctr).toFixed(2)}%`}</td>
+                    <td style={{ textAlign: "right", color: a.frecuencia > 3 ? "#f87171" : undefined }}>
+                      {a.frecuencia ? a.frecuencia.toFixed(1) : "—"}
+                    </td>
+                    <td style={{ textAlign: "right" }}>{fNumber(a.conversaciones)}</td>
+                    <td style={{ textAlign: "right" }}>{a.costo_conversacion != null ? fCurrency(a.costo_conversacion) : "—"}</td>
+                    <td style={{ textAlign: "right", fontWeight: 600 }}>{fNumber(a.pedidos)}</td>
+                    <td style={{ textAlign: "right", fontWeight: 600 }}>{a.costo_pedido != null ? fCurrency(a.costo_pedido) : "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="empty-state" style={{ padding: 16 }}>Sin anuncios con actividad en los últimos 30 días.</div>
+        )}
+      </section>
+
+      <section className="panel">
+        <header className="panel-head">
+          <h2>Recomendaciones de la IA de Meta</h2>
+          <span>Generadas por Meta para tus campañas activas</span>
+        </header>
+        {recomendaciones.length ? (
+          <div className="category-list">
+            {recomendaciones.map((rec, idx) => (
+              <div className="category-item" key={`${rec.objeto}-${idx}`}>
+                <div className="category-label-row">
+                  <span style={{ fontWeight: 600 }}>{rec.titulo || "Recomendación"}</span>
+                  <span style={{ color: "var(--muted)", fontSize: "0.75rem" }}>{rec.objeto}</span>
+                </div>
+                <p style={{ color: "var(--muted)", fontSize: "0.82rem", margin: "4px 0 0" }}>{rec.mensaje}</p>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="empty-state" style={{ padding: 16 }}>
+            Meta no tiene recomendaciones pendientes para tus campañas activas ahora mismo. Eso suele ser buena señal.
+          </div>
+        )}
+      </section>
     </>
   );
 }

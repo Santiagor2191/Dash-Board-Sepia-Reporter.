@@ -23,6 +23,8 @@ import {
   MELI_REDIRECT_URI,
   MELI_RATE_LIMIT_MAX_REQUESTS,
   MELI_RATE_LIMIT_WINDOW_MS,
+  META_ACCESS_TOKEN,
+  META_AD_ACCOUNT_ID,
   ML_ORDERS_CACHE_TTL_MS,
   ML_ORDERS_PAGE_LIMIT,
   PORT,
@@ -43,6 +45,7 @@ import { createOAuthStateStore } from "./src/security/oauthState.js";
 import { createHistoricalSalesService } from "./src/services/historicalSalesService.js";
 import { createClientesContabilidadService } from "./src/services/clientesContabilidadService.js";
 import { createMetaAdsSalesService } from "./src/services/metaAdsSalesService.js";
+import { createMetaAdsLiveService } from "./src/services/metaAdsLiveService.js";
 import { createMeliClient } from "./src/services/meliClient.js";
 import { createMeliOrdersService } from "./src/services/meliOrdersService.js";
 import { createProductAdsService } from "./src/services/productAdsService.js";
@@ -83,6 +86,10 @@ const metaAdsSalesService = createMetaAdsSalesService({
   dbPool,
   excelPath: SEPIA_CLIENTES_CONTABILIDAD_EXCEL_PATH,
   pythonBin: SEPIA_PYTHON_BIN,
+});
+const metaAdsLiveService = createMetaAdsLiveService({
+  accessToken: META_ACCESS_TOKEN,
+  adAccountId: META_AD_ACCOUNT_ID,
 });
 
 const oauthStateStore = createOAuthStateStore({ ttlMs: AUTH_STATE_TTL_MS });
@@ -161,7 +168,7 @@ app.use(
   "/db",
   dashboardAuth.requireSession,
   dbRateLimit,
-  createDbRouter({ historicalSalesService, clientesContabilidadService, metaAdsSalesService }),
+  createDbRouter({ historicalSalesService, clientesContabilidadService, metaAdsSalesService, metaAdsLiveService }),
 );
 app.use(
   "/meli",

@@ -5,6 +5,7 @@ export const createDbRouter = ({
   historicalSalesService,
   clientesContabilidadService,
   metaAdsSalesService,
+  metaAdsLiveService,
 }) => {
   const router = express.Router();
 
@@ -73,6 +74,20 @@ export const createDbRouter = ({
         res,
         "Error consultando ventas Meta Ads",
         "No se pudo consultar la tabla mensual de Meta Ads",
+        error,
+      );
+    }
+  });
+
+  router.get("/meta-ads-live", async (req, res) => {
+    try {
+      const live = await metaAdsLiveService.getLive();
+      return res.json({ ok: true, ...live });
+    } catch (error) {
+      return sendInternalError(
+        res,
+        "Error consultando Meta Ads en vivo",
+        "No se pudo consultar la API de Meta",
         error,
       );
     }

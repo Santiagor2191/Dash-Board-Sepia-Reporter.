@@ -81,6 +81,8 @@ export const DB_SSL = (process.env.DB_SSL || "false").toLowerCase() === "true";
 export const DB_CONNECTION_LIMIT = toNumber(process.env.DB_CONNECTION_LIMIT, 5);
 export const RENTABILIDAD_DB_NAME = process.env.RENTABILIDAD_DB_NAME || "publicaciones_ml_contabilidad";
 export const SEPIA_PYTHON_BIN = process.env.SEPIA_PYTHON_BIN || "python";
+export const META_ACCESS_TOKEN = toTrimmedString(process.env.META_ACCESS_TOKEN);
+export const META_AD_ACCOUNT_ID = toTrimmedString(process.env.META_AD_ACCOUNT_ID) || "act_2364835850377283";
 export const SEPIA_CLIENTES_CONTABILIDAD_EXCEL_PATH =
   process.env.SEPIA_CLIENTES_CONTABILIDAD_EXCEL_PATH ||
   "C:\\Users\\SANTIAGO\\OneDrive - uniminuto.edu\\Escritorio\\Datos Clientes Y Contabilidad.xlsx";
