@@ -1,5 +1,11 @@
 # Changelog — Dashboard Sepia BI
 
+## 2026-07-11
+
+### Meta Ads
+- El filtro del histórico mensual (antes chips de Años/Meses) ahora es el mismo **selector de fechas estilo Meta**, extraído a componente compartido `MetaDateRangePicker.jsx`. Presets extra para histórico: Este año, El año pasado y Máximo (default). Los KPIs, gráficas comparativas y Top 10 productos se recalculan con el rango elegido; "restablecer" vuelve a Máximo.
+- Helpers de fecha (`fmtYmd`, `daysAgo`, `prettyDate`) movidos a `utils.js`.
+
 ## 2026-07-10
 
 ### Meta Ads — métricas en vivo

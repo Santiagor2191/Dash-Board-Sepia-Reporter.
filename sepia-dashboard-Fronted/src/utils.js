@@ -14,6 +14,23 @@ export const COMPARISON_OPTIONS = [
 export const ALL_MONTH_VALUES = MONTHS.map((m) => m.value);
 export const MOBILE_BREAKPOINT = 960;
 
+// Fechas locales YYYY-MM-DD (para el selector de rango estilo Meta)
+export const fmtYmd = (d) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+
+export const daysAgo = (n) => {
+  const d = new Date();
+  d.setDate(d.getDate() - n);
+  return d;
+};
+
+const MONTH_SHORT_LOWER = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
+export const prettyDate = (ymd) => {
+  if (!ymd) return "—";
+  const [y, m, d] = ymd.split("-").map(Number);
+  return `${d} ${MONTH_SHORT_LOWER[m - 1] || m} ${y}`;
+};
+
 export const fCurrency = (n) => `$ ${Math.round(n || 0).toLocaleString("es-CO")}`;
 export const fNumber = (n) => (n || 0).toLocaleString("es-CO");
 export const fDate = (d) => d.toLocaleDateString("es-CO", { day: "2-digit", month: "short", year: "numeric" }).replace(".", "");

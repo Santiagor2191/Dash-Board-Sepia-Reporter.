@@ -12,8 +12,9 @@ import {
   YAxis,
 } from "recharts";
 import KPI from "../components/KPI";
+import MetaDateRangePicker from "../components/MetaDateRangePicker";
 import { getClientesContabilidadDashboard, getMetaAdsLive } from "../api";
-import { calcDelta, fCurrency, fNumber, MONTHS, ALL_MONTH_VALUES } from "../utils";
+import { calcDelta, fCurrency, fNumber, MONTHS, fmtYmd, daysAgo, prettyDate } from "../utils";
 
 const MONTH_SHORT = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
 
@@ -49,8 +50,22 @@ const KPI_COMPARISON_OPTIONS = [
   { id: "year", label: "Año anterior", monthsBack: 12, deltaLabel: "vs año anterior" },
 ];
 
-const toggleInArray = (arr, value) =>
-  arr.includes(value) ? arr.filter((v) => v !== value) : [...arr, value];
+// Presets extra para el histórico mensual (la data empieza en 2024)
+const buildHistExtraPresets = () => {
+  const today = new Date();
+  return [
+    { id: "este_anio", label: "Este año", since: `${today.getFullYear()}-01-01`, until: fmtYmd(today) },
+    { id: "anio_pasado", label: "El año pasado", since: `${today.getFullYear() - 1}-01-01`, until: `${today.getFullYear() - 1}-12-31` },
+    { id: "max", label: "Máximo", since: "2020-01-01", until: fmtYmd(today) },
+  ];
+};
+
+const DEFAULT_HIST_RANGE = () => ({
+  presetId: "max",
+  label: "Máximo",
+  since: "2020-01-01",
+  until: fmtYmd(new Date()),
+});
 
 const buildPeriodKey = (year, month) => `${year}-${month}`;
 
@@ -78,9 +93,8 @@ export default function VentasMetaAds() {
   const [effMetric, setEffMetric] = useState("roas");
   const [kpiComparison, setKpiComparison] = useState("month");
 
-  // null = aún no inicializado (carga inicial). [] = el usuario explícitamente no quiere ninguno.
-  const [selectedYears, setSelectedYears] = useState(null);
-  const [selectedMonths, setSelectedMonths] = useState(ALL_MONTH_VALUES);
+  // Rango de fechas del histórico (selector estilo Meta); "Máximo" = todo lo cargado
+  const [histRange, setHistRange] = useState(DEFAULT_HIST_RANGE);
 
   useEffect(() => {
     let cancelled = false;
@@ -175,33 +189,29 @@ export default function VentasMetaAds() {
     return rows;
   }, [ventaPorPeriodo, costoPorPeriodo, publicidadPorPeriodo]);
 
-  const yearsInData = useMemo(
-    () => [...new Set(allRows.map((r) => r.anio))].filter(Boolean).sort((a, b) => a - b),
-    [allRows],
-  );
-
-  // Inicializar selección de años cuando llegan los datos por primera vez
-  useEffect(() => {
-    if (yearsInData.length && selectedYears === null) {
-      setSelectedYears(yearsInData);
-    }
-  }, [yearsInData, selectedYears]);
-
-  // Sólo hace fallback durante la carga inicial; tras inicializar respeta lo elegido (incluido vacío)
-  const effectiveYears = selectedYears ?? yearsInData;
-  const effectiveMonths = selectedMonths;
-
-  const yearsSet = useMemo(() => new Set(effectiveYears), [effectiveYears]);
-  const monthsSet = useMemo(() => new Set(effectiveMonths), [effectiveMonths]);
+  // Un mes entra al filtro si se cruza con el rango elegido (la data es mensual)
+  const monthInRange = useMemo(() => {
+    const { since, until } = histRange;
+    return (anio, numMes) => {
+      const first = fmtYmd(new Date(anio, numMes - 1, 1));
+      const last = fmtYmd(new Date(anio, numMes, 0));
+      return first <= until && last >= since;
+    };
+  }, [histRange]);
 
   const filteredRows = useMemo(
-    () => allRows.filter((r) => yearsSet.has(r.anio) && monthsSet.has(r.numMes)),
-    [allRows, yearsSet, monthsSet],
+    () => allRows.filter((r) => monthInRange(r.anio, r.numMes)),
+    [allRows, monthInRange],
   );
 
   const yearsToShow = useMemo(
-    () => effectiveYears.filter((y) => yearsInData.includes(y)).sort((a, b) => a - b),
-    [effectiveYears, yearsInData],
+    () => [...new Set(filteredRows.map((r) => r.anio))].filter(Boolean).sort((a, b) => a - b),
+    [filteredRows],
+  );
+
+  const monthsSet = useMemo(
+    () => new Set(filteredRows.map((r) => r.numMes)),
+    [filteredRows],
   );
 
   const totals = useMemo(() => accumulateTotals(filteredRows), [filteredRows]);
@@ -326,7 +336,7 @@ export default function VentasMetaAds() {
       const anio = Number(row?.anio || 0);
       const mes = Number(row?.num_mes || 0);
       const producto = row?.producto;
-      if (!producto || !yearsSet.has(anio) || !monthsSet.has(mes)) return;
+      if (!producto || !anio || !mes || !monthInRange(anio, mes)) return;
 
       const entry = map.get(producto) || { title: producto, qty: 0, revenue: 0, orders: 0 };
       entry.qty += Number(row?.cantidad || 0);
@@ -335,24 +345,11 @@ export default function VentasMetaAds() {
       map.set(producto, entry);
     });
     return [...map.values()].sort((a, b) => b.qty - a.qty || b.revenue - a.revenue).slice(0, 10);
-  }, [productosPorPeriodo, yearsSet, monthsSet]);
+  }, [productosPorPeriodo, monthInRange]);
 
-  const resetFilters = () => {
-    setSelectedYears(yearsInData);
-    setSelectedMonths(ALL_MONTH_VALUES);
-  };
-
-  const filterSummary = (() => {
-    if (!filteredRows.length) return "Sin filas";
-    const yLabel = yearsToShow.length === yearsInData.length
-      ? "Todos los años"
-      : yearsToShow.join(", ") || "—";
-    const mActive = [...monthsSet].sort((a, b) => a - b);
-    const mLabel = mActive.length === ALL_MONTH_VALUES.length
-      ? "Todos los meses"
-      : mActive.map((n) => MONTH_SHORT[n - 1]).join(", ");
-    return `${yLabel} · ${mLabel} · ${filteredRows.length} meses con datos`;
-  })();
+  const filterSummary = filteredRows.length
+    ? `${histRange.label} · ${prettyDate(histRange.since)} – ${prettyDate(histRange.until)} · ${filteredRows.length} meses con datos`
+    : "Sin filas";
 
   if (loading) return <div className="empty-state">Cargando Ventas Meta Ads...</div>;
   if (error) return <div className="empty-state">Error: {error}</div>;
@@ -365,22 +362,14 @@ export default function VentasMetaAds() {
       <MetaAdsLiveSection />
 
       <section className="panel filter-panel">
-        <CompactFilterRow
-          label="Años"
-          options={yearsInData.map((y) => ({ value: y, label: String(y) }))}
-          selected={effectiveYears}
-          onToggle={(v) => setSelectedYears((prev) => toggleInArray(prev ?? yearsInData, v))}
-          onAll={() => setSelectedYears(yearsInData)}
-          onClear={() => setSelectedYears([])}
-        />
-        <CompactFilterRow
-          label="Meses"
-          options={MONTHS.map((m) => ({ value: m.value, label: m.label.slice(0, 3) }))}
-          selected={effectiveMonths}
-          onToggle={(v) => setSelectedMonths((prev) => toggleInArray(prev, v))}
-          onAll={() => setSelectedMonths(ALL_MONTH_VALUES)}
-          onClear={() => setSelectedMonths([])}
-        />
+        <div className="filter-row">
+          <span className="filter-row-label">Periodo</span>
+          <MetaDateRangePicker
+            range={histRange}
+            onApply={setHistRange}
+            extraPresets={buildHistExtraPresets()}
+          />
+        </div>
         <div className="filter-row">
           <span className="filter-row-label">Comparar</span>
           <div className="comparison-group comparison-group-compact">
@@ -403,7 +392,7 @@ export default function VentasMetaAds() {
             type="button"
             className="filter-mini"
             style={{ float: "right" }}
-            onClick={resetFilters}
+            onClick={() => setHistRange(DEFAULT_HIST_RANGE())}
           >
             restablecer
           </button>
@@ -599,188 +588,6 @@ export default function VentasMetaAds() {
   );
 }
 
-// --- Selector de fechas estilo Meta Ads Manager ---
-
-const fmtYmd = (d) =>
-  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-
-const daysAgo = (n) => {
-  const d = new Date();
-  d.setDate(d.getDate() - n);
-  return d;
-};
-
-const buildDateRanges = () => {
-  const today = new Date();
-  const monday = new Date(today);
-  monday.setDate(today.getDate() - ((today.getDay() + 6) % 7)); // lunes de esta semana
-  const lastMonday = new Date(monday);
-  lastMonday.setDate(monday.getDate() - 7);
-  const lastSunday = new Date(monday);
-  lastSunday.setDate(monday.getDate() - 1);
-  const firstOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-  const firstOfLastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
-  const endOfLastMonth = new Date(today.getFullYear(), today.getMonth(), 0);
-
-  return [
-    { id: "hoy", label: "Hoy", since: fmtYmd(today), until: fmtYmd(today) },
-    { id: "ayer", label: "Ayer", since: fmtYmd(daysAgo(1)), until: fmtYmd(daysAgo(1)) },
-    { id: "7d", label: "Últimos 7 días", since: fmtYmd(daysAgo(6)), until: fmtYmd(today) },
-    { id: "14d", label: "Últimos 14 días", since: fmtYmd(daysAgo(13)), until: fmtYmd(today) },
-    { id: "28d", label: "Últimos 28 días", since: fmtYmd(daysAgo(27)), until: fmtYmd(today) },
-    { id: "30d", label: "Últimos 30 días", since: fmtYmd(daysAgo(29)), until: fmtYmd(today) },
-    { id: "90d", label: "Últimos 90 días", since: fmtYmd(daysAgo(89)), until: fmtYmd(today) },
-    { id: "semana", label: "Esta semana", since: fmtYmd(monday), until: fmtYmd(today) },
-    { id: "semana_pasada", label: "La semana pasada", since: fmtYmd(lastMonday), until: fmtYmd(lastSunday) },
-    { id: "mes", label: "Este mes", since: fmtYmd(firstOfMonth), until: fmtYmd(today) },
-    { id: "mes_pasado", label: "El mes pasado", since: fmtYmd(firstOfLastMonth), until: fmtYmd(endOfLastMonth) },
-  ];
-};
-
-const prettyDate = (ymd) => {
-  if (!ymd) return "—";
-  const [y, m, d] = ymd.split("-").map(Number);
-  return `${d} ${MONTH_SHORT[m - 1]?.toLowerCase() || m} ${y}`;
-};
-
-function MetaDateRangePicker({ range, onApply }) {
-  const presets = useMemo(buildDateRanges, []);
-  const [open, setOpen] = useState(false);
-  const [draftPreset, setDraftPreset] = useState(range.presetId);
-  const [draftSince, setDraftSince] = useState(range.since);
-  const [draftUntil, setDraftUntil] = useState(range.until);
-
-  const openPanel = () => {
-    setDraftPreset(range.presetId);
-    setDraftSince(range.since);
-    setDraftUntil(range.until);
-    setOpen(true);
-  };
-
-  const pickPreset = (preset) => {
-    setDraftPreset(preset.id);
-    setDraftSince(preset.since);
-    setDraftUntil(preset.until);
-  };
-
-  const apply = () => {
-    if (!draftSince || !draftUntil || draftSince > draftUntil) return;
-    const preset = presets.find(
-      (p) => p.id === draftPreset && p.since === draftSince && p.until === draftUntil,
-    );
-    onApply({
-      presetId: preset ? preset.id : "personalizado",
-      label: preset ? preset.label : "Personalizado",
-      since: draftSince,
-      until: draftUntil,
-    });
-    setOpen(false);
-  };
-
-  return (
-    <div style={{ position: "relative" }}>
-      <button type="button" className="comparison-btn active" onClick={openPanel}>
-        {range.label} · {prettyDate(range.since)} – {prettyDate(range.until)} ▾
-      </button>
-
-      {open && (
-        <>
-          <div
-            style={{ position: "fixed", inset: 0, zIndex: 40 }}
-            onClick={() => setOpen(false)}
-          />
-          <div
-            style={{
-              position: "absolute",
-              right: 0,
-              top: "calc(100% + 6px)",
-              zIndex: 50,
-              display: "flex",
-              gap: 14,
-              padding: 14,
-              borderRadius: 14,
-              border: "1px solid var(--line)",
-              background: "var(--glass)",
-              backdropFilter: "blur(18px)",
-              boxShadow: "0 18px 40px rgba(0,0,0,0.45)",
-              minWidth: 380,
-            }}
-          >
-            <div style={{ display: "flex", flexDirection: "column", gap: 2, maxHeight: 280, overflowY: "auto", paddingRight: 6 }}>
-              {presets.map((preset) => {
-                const active = draftPreset === preset.id && draftSince === preset.since && draftUntil === preset.until;
-                return (
-                  <button
-                    key={preset.id}
-                    type="button"
-                    onClick={() => pickPreset(preset)}
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 8,
-                      padding: "6px 10px",
-                      borderRadius: 8,
-                      border: "none",
-                      cursor: "pointer",
-                      textAlign: "left",
-                      whiteSpace: "nowrap",
-                      background: active ? "rgba(148,163,184,0.16)" : "transparent",
-                      color: "var(--text)",
-                      fontSize: "0.82rem",
-                    }}
-                  >
-                    <span
-                      style={{
-                        width: 12,
-                        height: 12,
-                        borderRadius: "50%",
-                        border: active ? "4px solid #0ea5e9" : "2px solid var(--muted)",
-                        flexShrink: 0,
-                      }}
-                    />
-                    {preset.label}
-                  </button>
-                );
-              })}
-            </div>
-
-            <div style={{ display: "flex", flexDirection: "column", gap: 10, justifyContent: "space-between" }}>
-              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                <span style={{ color: "var(--muted)", fontSize: "0.75rem" }}>Rango personalizado</span>
-                <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: "0.72rem", color: "var(--muted)" }}>
-                  Desde
-                  <input
-                    type="date"
-                    value={draftSince}
-                    max={draftUntil || undefined}
-                    onChange={(e) => { setDraftSince(e.target.value); setDraftPreset("personalizado"); }}
-                    style={{ background: "transparent", color: "var(--text)", border: "1px solid var(--line)", borderRadius: 8, padding: "6px 8px", colorScheme: "dark" }}
-                  />
-                </label>
-                <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: "0.72rem", color: "var(--muted)" }}>
-                  Hasta
-                  <input
-                    type="date"
-                    value={draftUntil}
-                    min={draftSince || undefined}
-                    max={fmtYmd(new Date())}
-                    onChange={(e) => { setDraftUntil(e.target.value); setDraftPreset("personalizado"); }}
-                    style={{ background: "transparent", color: "var(--text)", border: "1px solid var(--line)", borderRadius: 8, padding: "6px 8px", colorScheme: "dark" }}
-                  />
-                </label>
-              </div>
-              <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
-                <button type="button" className="filter-mini" onClick={() => setOpen(false)}>Cancelar</button>
-                <button type="button" className="comparison-btn active" onClick={apply}>Actualizar</button>
-              </div>
-            </div>
-          </div>
-        </>
-      )}
-    </div>
-  );
-}
-
 const DEFAULT_LIVE_RANGE = () => ({
   presetId: "30d",
   label: "Últimos 30 días",
@@ -797,11 +604,18 @@ function MetaAdsLiveSection() {
 
   useEffect(() => {
     let cancelled = false;
-    setLoading(true);
-    getMetaAdsLive(range.since, range.until)
-      .then((payload) => { if (!cancelled) setLive(payload); })
-      .catch((err) => { if (!cancelled) setLive({ error: err?.message || "No se pudo consultar Meta." }); })
-      .finally(() => { if (!cancelled) setLoading(false); });
+    const load = async () => {
+      setLoading(true);
+      try {
+        const payload = await getMetaAdsLive(range.since, range.until);
+        if (!cancelled) setLive(payload);
+      } catch (err) {
+        if (!cancelled) setLive({ error: err?.message || "No se pudo consultar Meta." });
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+    load();
     return () => { cancelled = true; };
   }, [range.since, range.until]);
 
@@ -968,28 +782,6 @@ function MetaAdsLiveSection() {
         )}
       </section>
     </>
-  );
-}
-
-function CompactFilterRow({ label, options, selected, onToggle, onAll, onClear }) {
-  return (
-    <div className="filter-row">
-      <span className="filter-row-label">{label}</span>
-      {options.map((opt) => (
-        <button
-          key={opt.value}
-          type="button"
-          className={`filter-chip ${selected.includes(opt.value) ? "active" : ""}`}
-          onClick={() => onToggle(opt.value)}
-        >
-          {opt.label}
-        </button>
-      ))}
-      <div className="filter-row-actions">
-        <button type="button" className="filter-mini" onClick={onAll}>todos</button>
-        <button type="button" className="filter-mini" onClick={onClear}>ninguno</button>
-      </div>
-    </div>
   );
 }
 
