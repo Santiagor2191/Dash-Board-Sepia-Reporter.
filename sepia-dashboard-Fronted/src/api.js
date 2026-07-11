@@ -91,7 +91,12 @@ export const getDbResumen = () => request("/db/resumen");
 export const getInteligencia = () => request("/db/inteligencia");
 export const getClientesContabilidadDashboard = () => request("/db/clientes-contabilidad");
 export const getVentasMetaAdsDashboard = () => request("/db/ventas-meta-ads");
-export const getMetaAdsLive = () => request("/db/meta-ads-live");
+export const getMetaAdsLive = (since, until) =>
+  request(
+    since && until
+      ? `/db/meta-ads-live?since=${encodeURIComponent(since)}&until=${encodeURIComponent(until)}`
+      : "/db/meta-ads-live",
+  );
 export const getInventory = (force = false) =>
   request(`/meli/inventory${force ? "?force=true" : ""}`);
 export const getConversion = (force = false) =>

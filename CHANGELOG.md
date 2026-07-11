@@ -7,6 +7,7 @@
 - Nueva sección **"Recomendaciones de la IA de Meta"**: sugerencias que Meta genera para campañas y conjuntos activos.
 - **Alerta de presupuesto desalineado**: si un anuncio concentra >40% del gasto con costo por pedido >2x el mejor, el dashboard lo marca (Meta reparte plata hacia el CPM barato, no hacia el que más vende).
 - Config: `META_ACCESS_TOKEN` y `META_AD_ACCOUNT_ID` en el `.env` del backend (y en Render para producción). El token de usuario extendido dura ~60 días; al vencer, la sección lo avisa con mensaje claro.
+- **Filtro de fechas estilo Meta Ads Manager**: botón de periodo en "Campañas Meta en vivo" con panel de presets (Hoy, Ayer, Últimos 7/14/28/30/90 días, Esta semana, La semana pasada, Este mes, El mes pasado) + rango personalizado Desde/Hasta, con Cancelar/Actualizar. El backend acepta `?since=YYYY-MM-DD&until=YYYY-MM-DD` (fechas inválidas caen al default de 30 días); cache de 15 min por rango.
 
 ## 2026-06-18
 

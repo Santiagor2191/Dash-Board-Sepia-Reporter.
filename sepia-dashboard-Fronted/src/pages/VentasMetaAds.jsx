@@ -599,20 +599,211 @@ export default function VentasMetaAds() {
   );
 }
 
-// Sección "en vivo": métricas reales de la cuenta publicitaria (API de Meta, últimos 30 días)
+// --- Selector de fechas estilo Meta Ads Manager ---
+
+const fmtYmd = (d) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+
+const daysAgo = (n) => {
+  const d = new Date();
+  d.setDate(d.getDate() - n);
+  return d;
+};
+
+const buildDateRanges = () => {
+  const today = new Date();
+  const monday = new Date(today);
+  monday.setDate(today.getDate() - ((today.getDay() + 6) % 7)); // lunes de esta semana
+  const lastMonday = new Date(monday);
+  lastMonday.setDate(monday.getDate() - 7);
+  const lastSunday = new Date(monday);
+  lastSunday.setDate(monday.getDate() - 1);
+  const firstOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+  const firstOfLastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+  const endOfLastMonth = new Date(today.getFullYear(), today.getMonth(), 0);
+
+  return [
+    { id: "hoy", label: "Hoy", since: fmtYmd(today), until: fmtYmd(today) },
+    { id: "ayer", label: "Ayer", since: fmtYmd(daysAgo(1)), until: fmtYmd(daysAgo(1)) },
+    { id: "7d", label: "Últimos 7 días", since: fmtYmd(daysAgo(6)), until: fmtYmd(today) },
+    { id: "14d", label: "Últimos 14 días", since: fmtYmd(daysAgo(13)), until: fmtYmd(today) },
+    { id: "28d", label: "Últimos 28 días", since: fmtYmd(daysAgo(27)), until: fmtYmd(today) },
+    { id: "30d", label: "Últimos 30 días", since: fmtYmd(daysAgo(29)), until: fmtYmd(today) },
+    { id: "90d", label: "Últimos 90 días", since: fmtYmd(daysAgo(89)), until: fmtYmd(today) },
+    { id: "semana", label: "Esta semana", since: fmtYmd(monday), until: fmtYmd(today) },
+    { id: "semana_pasada", label: "La semana pasada", since: fmtYmd(lastMonday), until: fmtYmd(lastSunday) },
+    { id: "mes", label: "Este mes", since: fmtYmd(firstOfMonth), until: fmtYmd(today) },
+    { id: "mes_pasado", label: "El mes pasado", since: fmtYmd(firstOfLastMonth), until: fmtYmd(endOfLastMonth) },
+  ];
+};
+
+const prettyDate = (ymd) => {
+  if (!ymd) return "—";
+  const [y, m, d] = ymd.split("-").map(Number);
+  return `${d} ${MONTH_SHORT[m - 1]?.toLowerCase() || m} ${y}`;
+};
+
+function MetaDateRangePicker({ range, onApply }) {
+  const presets = useMemo(buildDateRanges, []);
+  const [open, setOpen] = useState(false);
+  const [draftPreset, setDraftPreset] = useState(range.presetId);
+  const [draftSince, setDraftSince] = useState(range.since);
+  const [draftUntil, setDraftUntil] = useState(range.until);
+
+  const openPanel = () => {
+    setDraftPreset(range.presetId);
+    setDraftSince(range.since);
+    setDraftUntil(range.until);
+    setOpen(true);
+  };
+
+  const pickPreset = (preset) => {
+    setDraftPreset(preset.id);
+    setDraftSince(preset.since);
+    setDraftUntil(preset.until);
+  };
+
+  const apply = () => {
+    if (!draftSince || !draftUntil || draftSince > draftUntil) return;
+    const preset = presets.find(
+      (p) => p.id === draftPreset && p.since === draftSince && p.until === draftUntil,
+    );
+    onApply({
+      presetId: preset ? preset.id : "personalizado",
+      label: preset ? preset.label : "Personalizado",
+      since: draftSince,
+      until: draftUntil,
+    });
+    setOpen(false);
+  };
+
+  return (
+    <div style={{ position: "relative" }}>
+      <button type="button" className="comparison-btn active" onClick={openPanel}>
+        {range.label} · {prettyDate(range.since)} – {prettyDate(range.until)} ▾
+      </button>
+
+      {open && (
+        <>
+          <div
+            style={{ position: "fixed", inset: 0, zIndex: 40 }}
+            onClick={() => setOpen(false)}
+          />
+          <div
+            style={{
+              position: "absolute",
+              right: 0,
+              top: "calc(100% + 6px)",
+              zIndex: 50,
+              display: "flex",
+              gap: 14,
+              padding: 14,
+              borderRadius: 14,
+              border: "1px solid var(--line)",
+              background: "var(--glass)",
+              backdropFilter: "blur(18px)",
+              boxShadow: "0 18px 40px rgba(0,0,0,0.45)",
+              minWidth: 380,
+            }}
+          >
+            <div style={{ display: "flex", flexDirection: "column", gap: 2, maxHeight: 280, overflowY: "auto", paddingRight: 6 }}>
+              {presets.map((preset) => {
+                const active = draftPreset === preset.id && draftSince === preset.since && draftUntil === preset.until;
+                return (
+                  <button
+                    key={preset.id}
+                    type="button"
+                    onClick={() => pickPreset(preset)}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
+                      padding: "6px 10px",
+                      borderRadius: 8,
+                      border: "none",
+                      cursor: "pointer",
+                      textAlign: "left",
+                      whiteSpace: "nowrap",
+                      background: active ? "rgba(148,163,184,0.16)" : "transparent",
+                      color: "var(--text)",
+                      fontSize: "0.82rem",
+                    }}
+                  >
+                    <span
+                      style={{
+                        width: 12,
+                        height: 12,
+                        borderRadius: "50%",
+                        border: active ? "4px solid #0ea5e9" : "2px solid var(--muted)",
+                        flexShrink: 0,
+                      }}
+                    />
+                    {preset.label}
+                  </button>
+                );
+              })}
+            </div>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: 10, justifyContent: "space-between" }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                <span style={{ color: "var(--muted)", fontSize: "0.75rem" }}>Rango personalizado</span>
+                <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: "0.72rem", color: "var(--muted)" }}>
+                  Desde
+                  <input
+                    type="date"
+                    value={draftSince}
+                    max={draftUntil || undefined}
+                    onChange={(e) => { setDraftSince(e.target.value); setDraftPreset("personalizado"); }}
+                    style={{ background: "transparent", color: "var(--text)", border: "1px solid var(--line)", borderRadius: 8, padding: "6px 8px", colorScheme: "dark" }}
+                  />
+                </label>
+                <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: "0.72rem", color: "var(--muted)" }}>
+                  Hasta
+                  <input
+                    type="date"
+                    value={draftUntil}
+                    min={draftSince || undefined}
+                    max={fmtYmd(new Date())}
+                    onChange={(e) => { setDraftUntil(e.target.value); setDraftPreset("personalizado"); }}
+                    style={{ background: "transparent", color: "var(--text)", border: "1px solid var(--line)", borderRadius: 8, padding: "6px 8px", colorScheme: "dark" }}
+                  />
+                </label>
+              </div>
+              <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+                <button type="button" className="filter-mini" onClick={() => setOpen(false)}>Cancelar</button>
+                <button type="button" className="comparison-btn active" onClick={apply}>Actualizar</button>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+const DEFAULT_LIVE_RANGE = () => ({
+  presetId: "30d",
+  label: "Últimos 30 días",
+  since: fmtYmd(daysAgo(29)),
+  until: fmtYmd(new Date()),
+});
+
+// Sección "en vivo": métricas reales de la cuenta publicitaria (API de Meta)
 // + recomendaciones generadas por la propia IA de Meta. Independiente de los filtros del Excel.
 function MetaAdsLiveSection() {
   const [live, setLive] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [range, setRange] = useState(DEFAULT_LIVE_RANGE);
 
   useEffect(() => {
     let cancelled = false;
-    getMetaAdsLive()
+    setLoading(true);
+    getMetaAdsLive(range.since, range.until)
       .then((payload) => { if (!cancelled) setLive(payload); })
       .catch((err) => { if (!cancelled) setLive({ error: err?.message || "No se pudo consultar Meta." }); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  }, []);
+  }, [range.since, range.until]);
 
   const anuncios = useMemo(() => {
     const rows = Array.isArray(live?.anuncios) ? [...live.anuncios] : [];
@@ -621,18 +812,32 @@ function MetaAdsLiveSection() {
     return rows;
   }, [live]);
 
+  const header = (
+    <header className="panel-head">
+      <div>
+        <h2>Campañas Meta en vivo</h2>
+        <span style={{ color: "var(--muted)", fontSize: "0.78rem" }}>
+          API de Meta · {prettyDate(range.since)} – {prettyDate(range.until)} · campañas Click-to-WhatsApp
+        </span>
+      </div>
+      <MetaDateRangePicker range={range} onApply={setRange} />
+    </header>
+  );
+
   if (loading) {
-    return <section className="panel"><div className="empty-state" style={{ padding: 16 }}>Consultando campañas en Meta...</div></section>;
+    return (
+      <section className="panel">
+        {header}
+        <div className="empty-state" style={{ padding: 16 }}>Consultando campañas en Meta...</div>
+      </section>
+    );
   }
   if (!live) return null;
 
   if (live.configured === false || live.error) {
     return (
       <section className="panel">
-        <header className="panel-head">
-          <h2>Campañas Meta en vivo</h2>
-          <span>API de Meta · últimos 30 días</span>
-        </header>
+        {header}
         <div className="empty-state" style={{ padding: 16 }}>{live.mensaje || live.error}</div>
       </section>
     );
@@ -645,13 +850,13 @@ function MetaAdsLiveSection() {
   const totalImpresiones = anuncios.reduce((acc, a) => acc + a.impresiones, 0);
 
   const kpisLive = [
-    { label: "Gasto (30 días)", value: fCurrency(totalGasto) },
+    { label: "Gasto", value: fCurrency(totalGasto) },
     { label: "Conversaciones", value: fNumber(totalConv) },
     { label: "Costo x Conversación", value: totalConv > 0 ? fCurrency(totalGasto / totalConv) : "—" },
     { label: "Pedidos", value: fNumber(totalPedidos) },
     { label: "Costo x Pedido", value: totalPedidos > 0 ? fCurrency(totalGasto / totalPedidos) : "—" },
     { label: "CTR promedio", value: totalImpresiones > 0 ? `${((totalClicks / totalImpresiones) * 100).toFixed(2)}%` : "—" },
-  ].map((kpi) => ({ ...kpi, deltaText: "Últimos 30 días" }));
+  ].map((kpi) => ({ ...kpi, deltaText: range.label }));
 
   // Alerta: Meta reparte presupuesto hacia el CPM barato, no hacia el que más cierra.
   // Señal: un anuncio concentra >40% del gasto con costo/pedido >2x el mejor del grupo.
@@ -669,14 +874,7 @@ function MetaAdsLiveSection() {
   return (
     <>
       <section className="panel">
-        <header className="panel-head">
-          <div>
-            <h2>Campañas Meta en vivo</h2>
-            <span style={{ color: "var(--muted)", fontSize: "0.78rem" }}>
-              API de Meta · últimos 30 días · campañas Click-to-WhatsApp
-            </span>
-          </div>
-        </header>
+        {header}
 
         <section className="kpi-grid" style={{ marginBottom: 16 }}>
           {kpisLive.map((kpi) => <KPI key={kpi.label} {...kpi} />)}
@@ -742,7 +940,7 @@ function MetaAdsLiveSection() {
             </table>
           </div>
         ) : (
-          <div className="empty-state" style={{ padding: 16 }}>Sin anuncios con actividad en los últimos 30 días.</div>
+          <div className="empty-state" style={{ padding: 16 }}>Sin anuncios con actividad en el periodo seleccionado.</div>
         )}
       </section>
 

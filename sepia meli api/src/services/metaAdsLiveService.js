@@ -2,6 +2,7 @@ import axios from "axios";
 
 const GRAPH_BASE = "https://graph.facebook.com/v23.0";
 const CACHE_TTL_MS = 15 * 60 * 1000;
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 // Métricas de conversión reales para campañas Click-to-WhatsApp.
 // Las de pixel/sitio (purchase, add_to_cart) NO aplican: viven en 0 y es esperado.
@@ -22,8 +23,7 @@ const friendlyGraphError = (error) => {
 };
 
 export const createMetaAdsLiveService = ({ accessToken, adAccountId }) => {
-  let cache = null;
-  let cacheAt = 0;
+  const cacheByRange = new Map(); // clave "since:until" -> { data, at }
 
   const graphGet = async (path, params = {}) => {
     const { data } = await axios.get(`${GRAPH_BASE}/${path}`, {
@@ -33,14 +33,14 @@ export const createMetaAdsLiveService = ({ accessToken, adAccountId }) => {
     return data;
   };
 
-  const fetchFresh = async () => {
+  const fetchFresh = async (rangeParams, periodo) => {
     const [insights, campaigns, adsets] = await Promise.all([
       graphGet(`${adAccountId}/insights`, {
         level: "ad",
-        date_preset: "last_30d",
         limit: 100,
         fields:
           "ad_id,ad_name,adset_name,campaign_name,spend,impressions,clicks,ctr,cpm,frequency,actions,cost_per_action_type",
+        ...rangeParams,
       }),
       graphGet(`${adAccountId}/campaigns`, {
         limit: 50,
@@ -86,10 +86,10 @@ export const createMetaAdsLiveService = ({ accessToken, adAccountId }) => {
         })),
       );
 
-    return { configured: true, periodo: "last_30d", anuncios, recomendaciones };
+    return { configured: true, periodo, anuncios, recomendaciones };
   };
 
-  const getLive = async () => {
+  const getLive = async ({ since, until } = {}) => {
     if (!accessToken) {
       return {
         configured: false,
@@ -98,15 +98,24 @@ export const createMetaAdsLiveService = ({ accessToken, adAccountId }) => {
       };
     }
 
-    if (cache && Date.now() - cacheAt < CACHE_TTL_MS) return cache;
+    const hasCustomRange = DATE_RE.test(since || "") && DATE_RE.test(until || "");
+    const rangeParams = hasCustomRange
+      ? { time_range: JSON.stringify({ since, until }) }
+      : { date_preset: "last_30d" };
+    const periodo = hasCustomRange ? `${since} a ${until}` : "last_30d";
+    const cacheKey = hasCustomRange ? `${since}:${until}` : "last_30d";
+
+    const cached = cacheByRange.get(cacheKey);
+    if (cached && Date.now() - cached.at < CACHE_TTL_MS) return cached.data;
 
     try {
-      cache = await fetchFresh();
-      cacheAt = Date.now();
-      return cache;
+      const data = await fetchFresh(rangeParams, periodo);
+      // ponytail: cache simple acotado; si crece mucho se vacía y ya
+      if (cacheByRange.size > 30) cacheByRange.clear();
+      cacheByRange.set(cacheKey, { data, at: Date.now() });
+      return data;
     } catch (error) {
-      // Si hay cache viejo, mejor servirlo que romper la página.
-      if (cache) return cache;
+      if (cached) return cached.data;
       return { configured: true, error: friendlyGraphError(error) };
     }
   };

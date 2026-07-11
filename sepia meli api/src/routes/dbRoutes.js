@@ -81,7 +81,10 @@ export const createDbRouter = ({
 
   router.get("/meta-ads-live", async (req, res) => {
     try {
-      const live = await metaAdsLiveService.getLive();
+      const live = await metaAdsLiveService.getLive({
+        since: String(req.query.since || ""),
+        until: String(req.query.until || ""),
+      });
       return res.json({ ok: true, ...live });
     } catch (error) {
       return sendInternalError(
