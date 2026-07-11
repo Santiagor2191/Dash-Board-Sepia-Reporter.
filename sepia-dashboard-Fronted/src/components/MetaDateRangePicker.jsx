@@ -1,4 +1,5 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { fmtYmd, daysAgo, prettyDate } from "../utils";
 
 // Selector de rango de fechas estilo Meta Ads Manager:
@@ -41,8 +42,19 @@ export default function MetaDateRangePicker({ range, onApply, extraPresets = [] 
   const [draftPreset, setDraftPreset] = useState(range.presetId);
   const [draftSince, setDraftSince] = useState(range.since);
   const [draftUntil, setDraftUntil] = useState(range.until);
+  const btnRef = useRef(null);
+  const [panelPos, setPanelPos] = useState({ top: 0, right: 8 });
 
   const openPanel = () => {
+    // El panel se monta en document.body (portal) para quedar por encima de
+    // cualquier tarjeta; se ancla a la posición del botón al abrirlo.
+    const rect = btnRef.current?.getBoundingClientRect();
+    if (rect) {
+      setPanelPos({
+        top: rect.bottom + 6,
+        right: Math.max(8, window.innerWidth - rect.right),
+      });
+    }
     setDraftPreset(range.presetId);
     setDraftSince(range.since);
     setDraftUntil(range.until);
@@ -71,31 +83,32 @@ export default function MetaDateRangePicker({ range, onApply, extraPresets = [] 
 
   return (
     <div style={{ position: "relative" }}>
-      <button type="button" className="comparison-btn active" onClick={openPanel}>
+      <button ref={btnRef} type="button" className="comparison-btn active" onClick={openPanel}>
         {range.label} · {prettyDate(range.since)} – {prettyDate(range.until)} ▾
       </button>
 
-      {open && (
+      {open && createPortal(
         <>
           <div
-            style={{ position: "fixed", inset: 0, zIndex: 40 }}
+            style={{ position: "fixed", inset: 0, zIndex: 999 }}
             onClick={() => setOpen(false)}
           />
           <div
             style={{
-              position: "absolute",
-              right: 0,
-              top: "calc(100% + 6px)",
-              zIndex: 50,
+              position: "fixed",
+              right: panelPos.right,
+              top: panelPos.top,
+              zIndex: 1000,
               display: "flex",
               gap: 14,
               padding: 14,
               borderRadius: 14,
-              border: "1px solid var(--line)",
-              background: "var(--glass)",
-              backdropFilter: "blur(18px)",
+              border: "1px solid var(--glass-border)",
+              background: "var(--bg)",
               boxShadow: "0 18px 40px rgba(0,0,0,0.45)",
               minWidth: 380,
+              maxWidth: "calc(100vw - 16px)",
+              flexWrap: "wrap",
             }}
           >
             <div style={{ display: "flex", flexDirection: "column", gap: 2, maxHeight: 280, overflowY: "auto", paddingRight: 6 }}>
@@ -167,7 +180,8 @@ export default function MetaDateRangePicker({ range, onApply, extraPresets = [] 
               </div>
             </div>
           </div>
-        </>
+        </>,
+        document.body,
       )}
     </div>
   );
