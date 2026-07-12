@@ -9,6 +9,11 @@
 ### Filtro global del tablero
 - La barra superior (Dashboard/Analytics/Órdenes/etc.) reemplazó el sistema "Año/Mes + Rango libre + Aplicar" por el **selector de fechas estilo Meta** compartido; los rangos aplican al instante y Mensual/Trimestral/Anual también. Se eliminó `MultiSelectDropdown` (~80 líneas menos). Nota: ya no hay selección de meses salteados, el filtro es siempre un rango continuo.
 
+### Redes — versión profesional con recomendaciones
+- **Comparación con el periodo anterior** en los KPIs de Instagram (alcance, vistas, interacciones, visitas al perfil, nuevos seguidores): el backend trae la ventana previa de igual duración y cada tarjeta muestra su % de cambio.
+- **Panel "Recomendaciones"** calculado con reglas sobre los datos reales: cadencia de publicación (meta 3–4/semana), formato ganador (video/foto/carrusel por interacciones promedio), tendencia de alcance, engagement sobre alcance (referencia 1–3%) y reparto de pauta FB/IG (>80% en FB dispara aviso de ubicaciones).
+- Encabezado con perfil: foto de @sepiamodaymas (link al perfil), seguidores y publicaciones. KPI nuevo de **Engagement %**. Gráfica de alcance como área con relleno copper. Tabla de publicaciones con columna de interacciones y la mejor del grupo marcada. Pauta por plataforma con **costo por 1.000 personas alcanzadas**.
+
 ### Nueva página "Redes"
 - **Instagram @sepiamodaymas**: seguidores, nuevos seguidores, alcance, vistas, visitas al perfil, interacciones, gráfica de alcance por día y últimas 12 publicaciones con likes/comentarios/link. **Facebook Sepia Moda y Más**: seguidores, interacciones, visitas y videos.
 - Backend: `metaSocialService.js` + `GET /db/meta-redes?since&until` (cache 15 min por rango). Límite de Meta manejado: IG entrega máx. 30 días por consulta → se recorta al final del rango y se avisa en la UI.

@@ -31,6 +31,20 @@ export const createMetaSocialService = ({ accessToken, adAccountId }) => {
     return data;
   };
 
+  // Totales de IG para una ventana de fechas (se usa para el periodo actual y el anterior)
+  const igWindow = (igId, since, until) =>
+    Promise.all([
+      graphGet(`${igId}/insights`, { metric: "reach", period: "day", since, until }).catch(() => null),
+      graphGet(`${igId}/insights`, { metric: "follower_count", period: "day", since, until }).catch(() => null),
+      graphGet(`${igId}/insights`, {
+        metric: "profile_views,accounts_engaged,likes,comments,total_interactions,views",
+        metric_type: "total_value",
+        period: "day",
+        since,
+        until,
+      }).catch(() => null),
+    ]);
+
   const fetchFresh = async (since, until, recortado) => {
     // Página con Instagram vinculado (Sepia Moda y Más)
     const accounts = await graphGet("me/accounts", {
@@ -42,23 +56,15 @@ export const createMetaSocialService = ({ accessToken, adAccountId }) => {
     if (!page) return { configured: true, error: "El token no tiene acceso a ninguna página de Facebook." };
 
     const ig = page.instagram_business_account;
-    const rango = { since, until };
 
-    const [reachSeries, followSeries, totals, media, pautaPorPlataforma, fbPosts] = await Promise.all([
-      ig
-        ? graphGet(`${ig.id}/insights`, { metric: "reach", period: "day", ...rango }).catch(() => null)
-        : null,
-      ig
-        ? graphGet(`${ig.id}/insights`, { metric: "follower_count", period: "day", ...rango }).catch(() => null)
-        : null,
-      ig
-        ? graphGet(`${ig.id}/insights`, {
-            metric: "profile_views,accounts_engaged,likes,comments,total_interactions,views",
-            metric_type: "total_value",
-            period: "day",
-            ...rango,
-          }).catch(() => null)
-        : null,
+    // Ventana anterior de igual duración, para los % de cambio
+    const dias = Math.round((new Date(until) - new Date(since)) / DAY_MS) + 1;
+    const prevUntil = fmtYmd(new Date(new Date(since).getTime() - DAY_MS));
+    const prevSince = fmtYmd(new Date(new Date(prevUntil).getTime() - (dias - 1) * DAY_MS));
+
+    const [actual, previo, media, pautaPorPlataforma, fbPosts] = await Promise.all([
+      ig ? igWindow(ig.id, since, until) : [null, null, null],
+      ig ? igWindow(ig.id, prevSince, prevUntil) : [null, null, null],
       ig
         ? graphGet(`${ig.id}/media`, {
             fields: "caption,media_type,like_count,comments_count,timestamp,permalink",
@@ -87,12 +93,28 @@ export const createMetaSocialService = ({ accessToken, adAccountId }) => {
       return (serie?.values || []).reduce((acc, v) => acc + (Number(v.value) || 0), 0);
     };
 
-    const totalValue = (name) => {
-      const item = (totals?.data || []).find((m) => m.name === name);
-      return Number(item?.total_value?.value) || 0;
+    // Resume la ventana [reach, followers, totales] en un objeto de métricas
+    const resumenVentana = ([reachSeries, followSeries, totals]) => {
+      const totalValue = (name) => {
+        const item = (totals?.data || []).find((m) => m.name === name);
+        return Number(item?.total_value?.value) || 0;
+      };
+      return {
+        alcance: sumSeries(reachSeries, "reach"),
+        nuevos_seguidores: sumSeries(followSeries, "follower_count"),
+        visitas_perfil: totalValue("profile_views"),
+        cuentas_interactuaron: totalValue("accounts_engaged"),
+        likes: totalValue("likes"),
+        comentarios: totalValue("comments"),
+        interacciones: totalValue("total_interactions"),
+        vistas: totalValue("views"),
+      };
     };
 
-    const alcancePorDia = ((reachSeries?.data || [])[0]?.values || []).map((v) => ({
+    const igActual = resumenVentana(actual);
+    const igPrevio = resumenVentana(previo);
+
+    const alcancePorDia = (((actual[0])?.data || [])[0]?.values || []).map((v) => ({
       fecha: String(v.end_time || "").slice(0, 10),
       alcance: Number(v.value) || 0,
     }));
@@ -106,14 +128,9 @@ export const createMetaSocialService = ({ accessToken, adAccountId }) => {
             seguidores: Number(ig.followers_count) || 0,
             publicaciones_total: Number(ig.media_count) || 0,
             foto: ig.profile_picture_url || null,
-            alcance: sumSeries(reachSeries, "reach"),
-            nuevos_seguidores: sumSeries(followSeries, "follower_count"),
-            visitas_perfil: totalValue("profile_views"),
-            cuentas_interactuaron: totalValue("accounts_engaged"),
-            likes: totalValue("likes"),
-            comentarios: totalValue("comments"),
-            interacciones: totalValue("total_interactions"),
-            vistas: totalValue("views"),
+            ...igActual,
+            previo: igPrevio,
+            periodo_previo: { since: prevSince, until: prevUntil },
             alcance_por_dia: alcancePorDia,
             posts: (media?.data || []).map((m) => ({
               fecha: m.timestamp,
