@@ -24,6 +24,23 @@ export const daysAgo = (n) => {
   return d;
 };
 
+// Presets extra estilo Meta para datos históricos (además de los estándar del picker)
+export const buildExtraRangePresets = () => {
+  const today = new Date();
+  return [
+    { id: "este_anio", label: "Este año", since: `${today.getFullYear()}-01-01`, until: fmtYmd(today) },
+    { id: "anio_pasado", label: "El año pasado", since: `${today.getFullYear() - 1}-01-01`, until: `${today.getFullYear() - 1}-12-31` },
+    { id: "max", label: "Máximo", since: "2020-01-01", until: fmtYmd(today) },
+  ];
+};
+
+export const DEFAULT_MAX_RANGE = () => ({
+  presetId: "max",
+  label: "Máximo",
+  since: "2020-01-01",
+  until: fmtYmd(new Date()),
+});
+
 const MONTH_SHORT_LOWER = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
 export const prettyDate = (ymd) => {
   if (!ymd) return "—";

@@ -14,7 +14,7 @@ import {
 import KPI from "../components/KPI";
 import MetaDateRangePicker from "../components/MetaDateRangePicker";
 import { getClientesContabilidadDashboard, getMetaAdsLive } from "../api";
-import { calcDelta, fCurrency, fNumber, MONTHS, fmtYmd, daysAgo, prettyDate } from "../utils";
+import { calcDelta, fCurrency, fNumber, MONTHS, fmtYmd, daysAgo, prettyDate, buildExtraRangePresets, DEFAULT_MAX_RANGE } from "../utils";
 
 const MONTH_SHORT = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
 
@@ -50,23 +50,6 @@ const KPI_COMPARISON_OPTIONS = [
   { id: "year", label: "Año anterior", monthsBack: 12, deltaLabel: "vs año anterior" },
 ];
 
-// Presets extra para el histórico mensual (la data empieza en 2024)
-const buildHistExtraPresets = () => {
-  const today = new Date();
-  return [
-    { id: "este_anio", label: "Este año", since: `${today.getFullYear()}-01-01`, until: fmtYmd(today) },
-    { id: "anio_pasado", label: "El año pasado", since: `${today.getFullYear() - 1}-01-01`, until: `${today.getFullYear() - 1}-12-31` },
-    { id: "max", label: "Máximo", since: "2020-01-01", until: fmtYmd(today) },
-  ];
-};
-
-const DEFAULT_HIST_RANGE = () => ({
-  presetId: "max",
-  label: "Máximo",
-  since: "2020-01-01",
-  until: fmtYmd(new Date()),
-});
-
 const buildPeriodKey = (year, month) => `${year}-${month}`;
 
 const shiftPeriodKey = (year, month, monthsOffset) => {
@@ -94,7 +77,7 @@ export default function VentasMetaAds() {
   const [kpiComparison, setKpiComparison] = useState("month");
 
   // Rango de fechas del histórico (selector estilo Meta); "Máximo" = todo lo cargado
-  const [histRange, setHistRange] = useState(DEFAULT_HIST_RANGE);
+  const [histRange, setHistRange] = useState(DEFAULT_MAX_RANGE);
 
   useEffect(() => {
     let cancelled = false;
@@ -367,7 +350,7 @@ export default function VentasMetaAds() {
           <MetaDateRangePicker
             range={histRange}
             onApply={setHistRange}
-            extraPresets={buildHistExtraPresets()}
+            extraPresets={buildExtraRangePresets()}
           />
         </div>
         <div className="filter-row">
@@ -392,7 +375,7 @@ export default function VentasMetaAds() {
             type="button"
             className="filter-mini"
             style={{ float: "right" }}
-            onClick={() => setHistRange(DEFAULT_HIST_RANGE())}
+            onClick={() => setHistRange(DEFAULT_MAX_RANGE())}
           >
             restablecer
           </button>

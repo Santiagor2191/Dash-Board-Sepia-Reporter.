@@ -6,6 +6,7 @@ export const createDbRouter = ({
   clientesContabilidadService,
   metaAdsSalesService,
   metaAdsLiveService,
+  metaSocialService,
 }) => {
   const router = express.Router();
 
@@ -90,6 +91,23 @@ export const createDbRouter = ({
       return sendInternalError(
         res,
         "Error consultando Meta Ads en vivo",
+        "No se pudo consultar la API de Meta",
+        error,
+      );
+    }
+  });
+
+  router.get("/meta-redes", async (req, res) => {
+    try {
+      const social = await metaSocialService.getSocial({
+        since: String(req.query.since || ""),
+        until: String(req.query.until || ""),
+      });
+      return res.json({ ok: true, ...social });
+    } catch (error) {
+      return sendInternalError(
+        res,
+        "Error consultando redes de Meta",
         "No se pudo consultar la API de Meta",
         error,
       );

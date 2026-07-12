@@ -7,10 +7,10 @@ import {
   logoutSession,
   getRentabilidadCostosMap,
 } from "./api";
-import MultiSelectDropdown from "./components/MultiSelectDropdown";
+import MetaDateRangePicker from "./components/MetaDateRangePicker";
 import {
-  MONTHS, COMPARISON_OPTIONS, ALL_MONTH_VALUES, MOBILE_BREAKPOINT,
-  fNumber, fDate,
+  COMPARISON_OPTIONS, MOBILE_BREAKPOINT,
+  fNumber, fDate, prettyDate, buildExtraRangePresets, DEFAULT_MAX_RANGE,
 } from "./utils";
 import "./App.css";
 
@@ -21,6 +21,7 @@ const NAV_ITEMS = [
   { path: "/inventario", label: "Inventario", icon: "IN" },
   { path: "/publicidad", label: "Publicidad", icon: "AD" },
   { path: "/ventas-meta-ads", label: "Ventas Meta Ads", icon: "MA" },
+  { path: "/redes", label: "Redes", icon: "IG" },
   { path: "/rentabilidad", label: "Rentabilidad", icon: "$" },
   { path: "/conversion", label: "Conversion", icon: "%" },
   { path: "/sync", label: "Sync", icon: "⟳" },
@@ -37,9 +38,6 @@ export default function App() {
   const [isMobileViewport, setIsMobileViewport] = useState(() => typeof window !== "undefined" ? window.innerWidth <= MOBILE_BREAKPOINT : false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [sidebarMobileOpen, setSidebarMobileOpen] = useState(false);
-  const [openDropdown, setOpenDropdown] = useState(null);
-  const [yearSearch, setYearSearch] = useState("");
-  const [monthSearch, setMonthSearch] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
   const [auth, setAuth] = useState({
     ready: false,
@@ -55,18 +53,9 @@ export default function App() {
   const [costosTitleMap, setCostosTitleMap] = useState({});
   const [connection, setConnection] = useState({ loading: true, source: "mock", error: null });
 
-  const [draftYears, setDraftYears] = useState([]);
-  const [draftMonths, setDraftMonths] = useState(ALL_MONTH_VALUES);
-  const [draftComparison, setDraftComparison] = useState("month");
-  const [draftDateFrom, setDraftDateFrom] = useState("");
-  const [draftDateTo, setDraftDateTo] = useState("");
-  const [filterMode, setFilterMode] = useState("period");
-  const [appliedYears, setAppliedYears] = useState([]);
-  const [appliedMonths, setAppliedMonths] = useState(ALL_MONTH_VALUES);
+  // Filtro global de fechas (selector estilo Meta) + granularidad de comparación
+  const [appliedRange, setAppliedRange] = useState(DEFAULT_MAX_RANGE);
   const [appliedComparison, setAppliedComparison] = useState("month");
-  const [appliedDateFrom, setAppliedDateFrom] = useState("");
-  const [appliedDateTo, setAppliedDateTo] = useState("");
-  const [appliedFilterMode, setAppliedFilterMode] = useState("period");
 
   // Clock
   useEffect(() => {
@@ -103,13 +92,6 @@ export default function App() {
     document.body.style.overflow = sidebarMobileOpen ? "hidden" : "";
     return () => { document.body.style.overflow = prev; };
   }, [isMobileViewport, sidebarMobileOpen]);
-
-  // Close dropdowns on outside click
-  useEffect(() => {
-    const handler = (e) => { if (!e.target.closest("[data-dropdown-root]")) setOpenDropdown(null); };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -203,40 +185,14 @@ export default function App() {
 
   const ordersSource = dbOrders;
 
-  const allYears = useMemo(() => {
-    const years = new Set();
-    ordersSource.forEach((o) => years.add(new Date(o.date).getFullYear()));
-    return [...years].sort((a, b) => b - a);
-  }, [ordersSource]);
-
-  useEffect(() => {
-    if (!allYears.length) return;
-    setDraftYears((prev) => prev.length ? prev.filter((y) => allYears.includes(y)) : allYears);
-    setAppliedYears((prev) => prev.length ? prev.filter((y) => allYears.includes(y)) : allYears);
-  }, [allYears]);
-
-  useEffect(() => {
-    if (allYears.length && !appliedYears.length) setAppliedYears(allYears);
-  }, [allYears, appliedYears.length]);
-
   const filteredAll = useMemo(() => {
-    if (appliedFilterMode === "range") {
-      const from = appliedDateFrom ? new Date(appliedDateFrom + "T00:00:00") : null;
-      const to = appliedDateTo ? new Date(appliedDateTo + "T23:59:59") : null;
-      return ordersSource.filter((o) => {
-        const d = new Date(o.date);
-        if (from && d < from) return false;
-        if (to && d > to) return false;
-        return true;
-      });
-    }
-    const years = new Set(appliedYears.length ? appliedYears : allYears);
-    const months = new Set(appliedMonths.length ? appliedMonths : ALL_MONTH_VALUES);
+    const from = new Date(appliedRange.since + "T00:00:00");
+    const to = new Date(appliedRange.until + "T23:59:59");
     return ordersSource.filter((o) => {
       const d = new Date(o.date);
-      return years.has(d.getFullYear()) && months.has(d.getMonth() + 1);
+      return d >= from && d <= to;
     });
-  }, [ordersSource, appliedFilterMode, appliedYears, appliedMonths, appliedDateFrom, appliedDateTo, allYears]);
+  }, [ordersSource, appliedRange.since, appliedRange.until]);
 
   const liveRangeSummary = useMemo(() => {
     if (!ordersSource.length) return null;
@@ -253,44 +209,14 @@ export default function App() {
     return `${fDate(first)} al ${fDate(last)} · ${comp}`;
   }, [sortedOrders, appliedComparison]);
 
-  const toggleMulti = (value, setter) => {
-    setter((prev) => prev.includes(value) ? prev.filter((v) => v !== value) : [...prev, value]);
-  };
-
-  const applyFilters = () => {
-    setAppliedFilterMode(filterMode);
-    setAppliedComparison(draftComparison);
-    if (filterMode === "range") {
-      setAppliedDateFrom(draftDateFrom);
-      setAppliedDateTo(draftDateTo);
-    } else {
-      const nextYears = draftYears.length ? [...draftYears] : allYears;
-      const nextMonths = draftMonths.length ? [...draftMonths] : ALL_MONTH_VALUES;
-      setDraftYears(nextYears);
-      setDraftMonths(nextMonths);
-      setAppliedYears(nextYears);
-      setAppliedMonths(nextMonths);
-    }
-    setOpenDropdown(null);
+  const applyRange = (r) => {
+    setAppliedRange(r);
     if (isMobileViewport) setSidebarMobileOpen(false);
   };
 
   const resetFilters = () => {
-    setFilterMode("period");
-    setDraftDateFrom("");
-    setDraftDateTo("");
-    setAppliedFilterMode("period");
-    setAppliedDateFrom("");
-    setAppliedDateTo("");
-    setDraftYears(allYears);
-    setDraftMonths(ALL_MONTH_VALUES);
-    setDraftComparison("month");
-    setAppliedYears(allYears);
-    setAppliedMonths(ALL_MONTH_VALUES);
+    setAppliedRange(DEFAULT_MAX_RANGE());
     setAppliedComparison("month");
-    setYearSearch("");
-    setMonthSearch("");
-    setOpenDropdown(null);
   };
 
   const dataMode = connection.loading ? "Sincronizando"
@@ -411,7 +337,7 @@ export default function App() {
               to={item.path}
               end={item.path === "/"}
               className={({ isActive }) => `nav-item ${isActive ? "active" : ""}`}
-              onClick={() => { setSidebarMobileOpen(false); setOpenDropdown(null); }}
+              onClick={() => setSidebarMobileOpen(false)}
             >
               <span>{item.icon}</span><span>{item.label}</span>
             </NavLink>
@@ -420,19 +346,11 @@ export default function App() {
         <div className="sidebar-filters">
           <div className="sidebar-section-title">Filtro activo</div>
           <div className="sidebar-chip-row">
-            {appliedFilterMode === "range" ? (
-              <span className="chip">{appliedDateFrom || "Inicio"} → {appliedDateTo || "Hoy"}</span>
-            ) : (
-              <>
-                <span className="chip">Años: {appliedYears.length}</span>
-                <span className="chip">Meses: {appliedMonths.length}</span>
-              </>
-            )}
+            <span className="chip">{appliedRange.label}: {prettyDate(appliedRange.since)} → {prettyDate(appliedRange.until)}</span>
             <span className="chip">{COMPARISON_OPTIONS.find((o) => o.id === appliedComparison)?.label}</span>
           </div>
         </div>
         <div className="sidebar-footer">
-          <button type="button" className="btn btn-primary" onClick={applyFilters}>Aplicar</button>
           <button type="button" className="btn btn-muted" onClick={resetFilters}>Reset</button>
         </div>
       </aside>
@@ -450,28 +368,16 @@ export default function App() {
               </div>
             </div>
             <div className="topbar-right">
-              <div className="comparison-group">
-                <button type="button" className={`comparison-btn ${filterMode === "period" ? "active" : ""}`} onClick={() => setFilterMode("period")}>Año/Mes</button>
-                <button type="button" className={`comparison-btn ${filterMode === "range" ? "active" : ""}`} onClick={() => setFilterMode("range")}>Rango libre</button>
-              </div>
-              {filterMode === "period" ? (
-                <>
-                  <MultiSelectDropdown title="Anio" options={allYears.map((y) => ({ value: y, label: String(y) }))} open={openDropdown === "year"} onToggle={() => setOpenDropdown((p) => p === "year" ? null : "year")} selectedValues={draftYears} searchValue={yearSearch} onSearchChange={setYearSearch} onToggleValue={(v) => toggleMulti(v, setDraftYears)} onSelectAll={() => setDraftYears(allYears)} onClear={() => setDraftYears([])} />
-                  <MultiSelectDropdown title="Mes" options={MONTHS} open={openDropdown === "month"} onToggle={() => setOpenDropdown((p) => p === "month" ? null : "month")} selectedValues={draftMonths} searchValue={monthSearch} onSearchChange={setMonthSearch} onToggleValue={(v) => toggleMulti(v, setDraftMonths)} onSelectAll={() => setDraftMonths(ALL_MONTH_VALUES)} onClear={() => setDraftMonths([])} />
-                </>
-              ) : (
-                <div className="date-range-group">
-                  <input type="date" className="date-input" value={draftDateFrom} onChange={(e) => setDraftDateFrom(e.target.value)} />
-                  <span className="date-sep">→</span>
-                  <input type="date" className="date-input" value={draftDateTo} onChange={(e) => setDraftDateTo(e.target.value)} />
-                </div>
-              )}
+              <MetaDateRangePicker
+                range={appliedRange}
+                onApply={applyRange}
+                extraPresets={buildExtraRangePresets()}
+              />
               <div className="comparison-group">
                 {COMPARISON_OPTIONS.map((opt) => (
-                  <button key={opt.id} type="button" className={`comparison-btn ${draftComparison === opt.id ? "active" : ""}`} onClick={() => setDraftComparison(opt.id)}>{opt.label}</button>
+                  <button key={opt.id} type="button" className={`comparison-btn ${appliedComparison === opt.id ? "active" : ""}`} onClick={() => setAppliedComparison(opt.id)}>{opt.label}</button>
                 ))}
               </div>
-              <button type="button" className="btn btn-primary" onClick={applyFilters}>Aplicar</button>
               <button type="button" className="btn btn-theme" onClick={() => setTheme((p) => p === "dark" ? "light" : "dark")}>{theme === "dark" ? "Oscuro" : "Claro"}</button>
               {auth.enabled && <button type="button" className="btn btn-muted" onClick={handleLogout}>Salir</button>}
             </div>

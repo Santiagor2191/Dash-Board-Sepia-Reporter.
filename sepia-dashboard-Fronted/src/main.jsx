@@ -12,6 +12,7 @@ const Inventario = lazy(() => import("./pages/Inventario.jsx"));
 const Rentabilidad = lazy(() => import("./pages/Rentabilidad.jsx"));
 const Conversion = lazy(() => import("./pages/Conversion.jsx"));
 const VentasMetaAds = lazy(() => import("./pages/VentasMetaAds.jsx"));
+const Redes = lazy(() => import("./pages/Redes.jsx"));
 const SyncAdmin = lazy(() => import("./pages/SyncAdmin.jsx"));
 
 const renderPage = (Component) => (
@@ -33,6 +34,7 @@ createRoot(document.getElementById("root")).render(
           <Route path="rentabilidad" element={renderPage(Rentabilidad)} />
           <Route path="conversion" element={renderPage(Conversion)} />
           <Route path="ventas-meta-ads" element={renderPage(VentasMetaAds)} />
+          <Route path="redes" element={renderPage(Redes)} />
           <Route path="sync" element={renderPage(SyncAdmin)} />
         </Route>
       </Routes>

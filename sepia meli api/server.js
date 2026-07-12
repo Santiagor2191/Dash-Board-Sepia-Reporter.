@@ -46,6 +46,7 @@ import { createHistoricalSalesService } from "./src/services/historicalSalesServ
 import { createClientesContabilidadService } from "./src/services/clientesContabilidadService.js";
 import { createMetaAdsSalesService } from "./src/services/metaAdsSalesService.js";
 import { createMetaAdsLiveService } from "./src/services/metaAdsLiveService.js";
+import { createMetaSocialService } from "./src/services/metaSocialService.js";
 import { createMeliClient } from "./src/services/meliClient.js";
 import { createMeliOrdersService } from "./src/services/meliOrdersService.js";
 import { createProductAdsService } from "./src/services/productAdsService.js";
@@ -91,6 +92,7 @@ const metaAdsLiveService = createMetaAdsLiveService({
   accessToken: META_ACCESS_TOKEN,
   adAccountId: META_AD_ACCOUNT_ID,
 });
+const metaSocialService = createMetaSocialService({ accessToken: META_ACCESS_TOKEN });
 
 const oauthStateStore = createOAuthStateStore({ ttlMs: AUTH_STATE_TTL_MS });
 const meliTokenStore = createMeliTokenStore({ dbPool });
@@ -168,7 +170,7 @@ app.use(
   "/db",
   dashboardAuth.requireSession,
   dbRateLimit,
-  createDbRouter({ historicalSalesService, clientesContabilidadService, metaAdsSalesService, metaAdsLiveService }),
+  createDbRouter({ historicalSalesService, clientesContabilidadService, metaAdsSalesService, metaAdsLiveService, metaSocialService }),
 );
 app.use(
   "/meli",

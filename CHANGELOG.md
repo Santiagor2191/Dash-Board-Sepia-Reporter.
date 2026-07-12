@@ -6,6 +6,14 @@
 - El filtro del histórico mensual (antes chips de Años/Meses) ahora es el mismo **selector de fechas estilo Meta**, extraído a componente compartido `MetaDateRangePicker.jsx`. Presets extra para histórico: Este año, El año pasado y Máximo (default). Los KPIs, gráficas comparativas y Top 10 productos se recalculan con el rango elegido; "restablecer" vuelve a Máximo.
 - Helpers de fecha (`fmtYmd`, `daysAgo`, `prettyDate`) movidos a `utils.js`.
 
+### Filtro global del tablero
+- La barra superior (Dashboard/Analytics/Órdenes/etc.) reemplazó el sistema "Año/Mes + Rango libre + Aplicar" por el **selector de fechas estilo Meta** compartido; los rangos aplican al instante y Mensual/Trimestral/Anual también. Se eliminó `MultiSelectDropdown` (~80 líneas menos). Nota: ya no hay selección de meses salteados, el filtro es siempre un rango continuo.
+
+### Nueva página "Redes"
+- **Instagram @sepiamodaymas**: seguidores, nuevos seguidores, alcance, vistas, visitas al perfil, interacciones, gráfica de alcance por día y últimas 12 publicaciones con likes/comentarios/link. **Facebook Sepia Moda y Más**: seguidores, interacciones, visitas y videos.
+- Backend: `metaSocialService.js` + `GET /db/meta-redes?since&until` (cache 15 min por rango). Límite de Meta manejado: IG entrega máx. 30 días por consulta → se recorta al final del rango y se avisa en la UI.
+- Token regenerado como usuario del sistema (no vence) con permisos +`instagram_basic` +`instagram_manage_insights` tras agregar el caso de uso de Instagram a la app "Ads For Manus".
+
 ## 2026-07-10
 
 ### Meta Ads — métricas en vivo

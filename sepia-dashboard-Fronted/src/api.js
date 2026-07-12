@@ -91,6 +91,8 @@ export const getDbResumen = () => request("/db/resumen");
 export const getInteligencia = () => request("/db/inteligencia");
 export const getClientesContabilidadDashboard = () => request("/db/clientes-contabilidad");
 export const getVentasMetaAdsDashboard = () => request("/db/ventas-meta-ads");
+export const getMetaRedes = (since, until) =>
+  request(`/db/meta-redes?since=${encodeURIComponent(since)}&until=${encodeURIComponent(until)}`);
 export const getMetaAdsLive = (since, until) =>
   request(
     since && until
