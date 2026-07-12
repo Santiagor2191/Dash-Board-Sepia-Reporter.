@@ -20,7 +20,7 @@ const friendlyGraphError = (error) => {
   return graphError?.message || error?.message || "Error consultando la API de Meta.";
 };
 
-export const createMetaSocialService = ({ accessToken }) => {
+export const createMetaSocialService = ({ accessToken, adAccountId }) => {
   const cache = new Map(); // "since:until" -> { data, at }
 
   const graphGet = async (path, params = {}, token = accessToken) => {
@@ -44,7 +44,7 @@ export const createMetaSocialService = ({ accessToken }) => {
     const ig = page.instagram_business_account;
     const rango = { since, until };
 
-    const [reachSeries, followSeries, totals, media, fbInsights, fbPosts] = await Promise.all([
+    const [reachSeries, followSeries, totals, media, pautaPorPlataforma, fbPosts] = await Promise.all([
       ig
         ? graphGet(`${ig.id}/insights`, { metric: "reach", period: "day", ...rango }).catch(() => null)
         : null,
@@ -65,11 +65,17 @@ export const createMetaSocialService = ({ accessToken }) => {
             limit: 12,
           }).catch(() => null)
         : null,
-      graphGet(`${page.id}/insights`, {
-        metric: "page_post_engagements,page_views_total,page_video_views",
-        period: "day",
-        ...rango,
-      }, page.access_token).catch(() => null),
+      // Meta retiró las métricas orgánicas de página de la API (devuelven vacío/0).
+      // Lo que Business Suite muestra como "actividad de Facebook" es sobre todo
+      // el alcance de la pauta → se lee de la cuenta publicitaria por plataforma.
+      adAccountId
+        ? graphGet(`${adAccountId}/insights`, {
+            level: "account",
+            breakdowns: "publisher_platform",
+            fields: "reach,impressions,spend",
+            time_range: JSON.stringify({ since, until }),
+          }).catch(() => null)
+        : null,
       graphGet(`${page.id}/published_posts`, {
         fields: "message,created_time,permalink_url",
         limit: 5,
@@ -122,15 +128,18 @@ export const createMetaSocialService = ({ accessToken }) => {
       facebook: {
         nombre: page.name,
         seguidores: Number(page.followers_count || page.fan_count) || 0,
-        interacciones: sumSeries(fbInsights, "page_post_engagements"),
-        visitas_pagina: sumSeries(fbInsights, "page_views_total"),
-        reproducciones_video: sumSeries(fbInsights, "page_video_views"),
         posts: (fbPosts?.data || []).map((p) => ({
           fecha: p.created_time,
           mensaje: (p.message || "").slice(0, 80),
           link: p.permalink_url,
         })),
       },
+      pauta_por_plataforma: (pautaPorPlataforma?.data || []).map((row) => ({
+        plataforma: row.publisher_platform,
+        alcance: Number(row.reach) || 0,
+        impresiones: Number(row.impressions) || 0,
+        gasto: Number(row.spend) || 0,
+      })),
     };
   };
 

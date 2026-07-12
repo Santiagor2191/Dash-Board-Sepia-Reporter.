@@ -11,7 +11,7 @@ import {
 import KPI from "../components/KPI";
 import MetaDateRangePicker from "../components/MetaDateRangePicker";
 import { getMetaRedes } from "../api";
-import { fNumber, fmtYmd, daysAgo, prettyDate } from "../utils";
+import { fCurrency, fNumber, fmtYmd, daysAgo, prettyDate } from "../utils";
 
 const DEFAULT_RANGE = () => ({
   presetId: "30d",
@@ -159,29 +159,42 @@ export default function Redes() {
       {fb && (
         <section className="panel">
           <header className="panel-head">
-            <h2>Facebook — {fb.nombre}</h2>
-            <span>{fNumber(fb.seguidores)} seguidores</span>
+            <div>
+              <h2>Facebook — {fb.nombre}</h2>
+              <span style={{ color: "var(--muted)", fontSize: "0.78rem" }}>
+                {fNumber(fb.seguidores)} seguidores · el alcance de Facebook viene de tu pauta (los anuncios corren en el feed de Facebook)
+              </span>
+            </div>
           </header>
-          <div className="category-list">
-            <div className="category-item">
-              <div className="category-label-row">
-                <span style={{ color: "var(--muted)" }}>Interacciones con publicaciones</span>
-                <span style={{ fontWeight: 600 }}>{fNumber(fb.interacciones)}</span>
-              </div>
+          {(data.pauta_por_plataforma || []).length ? (
+            <div className="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Pauta por plataforma</th>
+                    <th style={{ textAlign: "right" }}>Alcance</th>
+                    <th style={{ textAlign: "right" }}>Impresiones</th>
+                    <th style={{ textAlign: "right" }}>Gasto</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {data.pauta_por_plataforma.map((p) => (
+                    <tr key={p.plataforma}>
+                      <td style={{ textTransform: "capitalize", fontWeight: 600 }}>{p.plataforma}</td>
+                      <td style={{ textAlign: "right", fontWeight: 600 }}>{fNumber(p.alcance)}</td>
+                      <td style={{ textAlign: "right" }}>{fNumber(p.impresiones)}</td>
+                      <td style={{ textAlign: "right" }}>{fCurrency(p.gasto)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
-            <div className="category-item">
-              <div className="category-label-row">
-                <span style={{ color: "var(--muted)" }}>Visitas a la página</span>
-                <span style={{ fontWeight: 600 }}>{fNumber(fb.visitas_pagina)}</span>
-              </div>
-            </div>
-            <div className="category-item">
-              <div className="category-label-row">
-                <span style={{ color: "var(--muted)" }}>Reproducciones de video</span>
-                <span style={{ fontWeight: 600 }}>{fNumber(fb.reproducciones_video)}</span>
-              </div>
-            </div>
-          </div>
+          ) : (
+            <div className="empty-state" style={{ padding: 16 }}>Sin pauta activa en el periodo.</div>
+          )}
+          <p style={{ color: "var(--muted)", fontSize: "0.75rem", marginTop: 10 }}>
+            Meta retiró de su API las métricas orgánicas de páginas de Facebook (interacciones, visitas, videos) — por eso no se muestran aquí. Lo que ves en Business Suite como actividad de Facebook corresponde principalmente a esta pauta.
+          </p>
         </section>
       )}
     </>

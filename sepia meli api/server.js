@@ -92,7 +92,10 @@ const metaAdsLiveService = createMetaAdsLiveService({
   accessToken: META_ACCESS_TOKEN,
   adAccountId: META_AD_ACCOUNT_ID,
 });
-const metaSocialService = createMetaSocialService({ accessToken: META_ACCESS_TOKEN });
+const metaSocialService = createMetaSocialService({
+  accessToken: META_ACCESS_TOKEN,
+  adAccountId: META_AD_ACCOUNT_ID,
+});
 
 const oauthStateStore = createOAuthStateStore({ ttlMs: AUTH_STATE_TTL_MS });
 const meliTokenStore = createMeliTokenStore({ dbPool });
