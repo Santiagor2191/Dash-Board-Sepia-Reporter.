@@ -12,6 +12,18 @@ const MAX_IG_DAYS = 30;
 
 const fmtYmd = (d) => d.toISOString().slice(0, 10);
 
+const ACTION_CONVERSACION = "onsite_conversion.messaging_conversation_started_7d";
+
+const mapPauta = (payload) =>
+  (payload?.data || []).map((row) => ({
+    plataforma: row.publisher_platform,
+    alcance: Number(row.reach) || 0,
+    impresiones: Number(row.impressions) || 0,
+    gasto: Number(row.spend) || 0,
+    conversaciones:
+      Number((row.actions || []).find((a) => a.action_type === ACTION_CONVERSACION)?.value) || 0,
+  }));
+
 const friendlyGraphError = (error) => {
   const graphError = error?.response?.data?.error;
   if (graphError?.code === 190) {
@@ -62,7 +74,20 @@ export const createMetaSocialService = ({ accessToken, adAccountId }) => {
     const prevUntil = fmtYmd(new Date(new Date(since).getTime() - DAY_MS));
     const prevSince = fmtYmd(new Date(new Date(prevUntil).getTime() - (dias - 1) * DAY_MS));
 
-    const [actual, previo, media, pautaPorPlataforma, fbPosts] = await Promise.all([
+    // Meta retiró las métricas orgánicas de página de la API (devuelven vacío/0).
+    // Lo que Business Suite muestra como "actividad de Facebook" es sobre todo
+    // el alcance de la pauta → se lee de la cuenta publicitaria por plataforma.
+    const pautaWindow = (s, u) =>
+      adAccountId
+        ? graphGet(`${adAccountId}/insights`, {
+            level: "account",
+            breakdowns: "publisher_platform",
+            fields: "reach,impressions,spend,actions",
+            time_range: JSON.stringify({ since: s, until: u }),
+          }).catch(() => null)
+        : null;
+
+    const [actual, previo, media, pautaPorPlataforma, pautaPrevia, fbPosts] = await Promise.all([
       ig ? igWindow(ig.id, since, until) : [null, null, null],
       ig ? igWindow(ig.id, prevSince, prevUntil) : [null, null, null],
       ig
@@ -71,17 +96,8 @@ export const createMetaSocialService = ({ accessToken, adAccountId }) => {
             limit: 12,
           }).catch(() => null)
         : null,
-      // Meta retiró las métricas orgánicas de página de la API (devuelven vacío/0).
-      // Lo que Business Suite muestra como "actividad de Facebook" es sobre todo
-      // el alcance de la pauta → se lee de la cuenta publicitaria por plataforma.
-      adAccountId
-        ? graphGet(`${adAccountId}/insights`, {
-            level: "account",
-            breakdowns: "publisher_platform",
-            fields: "reach,impressions,spend",
-            time_range: JSON.stringify({ since, until }),
-          }).catch(() => null)
-        : null,
+      pautaWindow(since, until),
+      pautaWindow(prevSince, prevUntil),
       graphGet(`${page.id}/published_posts`, {
         fields: "message,created_time,permalink_url",
         limit: 5,
@@ -151,12 +167,8 @@ export const createMetaSocialService = ({ accessToken, adAccountId }) => {
           link: p.permalink_url,
         })),
       },
-      pauta_por_plataforma: (pautaPorPlataforma?.data || []).map((row) => ({
-        plataforma: row.publisher_platform,
-        alcance: Number(row.reach) || 0,
-        impresiones: Number(row.impressions) || 0,
-        gasto: Number(row.spend) || 0,
-      })),
+      pauta_por_plataforma: mapPauta(pautaPorPlataforma),
+      pauta_previa: mapPauta(pautaPrevia),
     };
   };
 

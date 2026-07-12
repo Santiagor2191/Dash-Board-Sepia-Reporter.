@@ -220,6 +220,50 @@ export default function Redes() {
   }
 
   const deltaVs = "vs periodo anterior";
+
+  // Cuadro Facebook: pauta en la plataforma facebook, actual vs periodo anterior
+  const pautaFb = pauta.find((p) => p.plataforma === "facebook");
+  const pautaFbPrev = (data.pauta_previa || []).find((p) => p.plataforma === "facebook");
+  const kpisFb = pautaFb ? [
+    {
+      label: "Alcance (pauta)",
+      value: fNumber(pautaFb.alcance),
+      delta: pautaFbPrev ? calcDelta(pautaFb.alcance, pautaFbPrev.alcance) : null,
+      deltaLabel: deltaVs,
+    },
+    {
+      label: "Impresiones (pauta)",
+      value: fNumber(pautaFb.impresiones),
+      delta: pautaFbPrev ? calcDelta(pautaFb.impresiones, pautaFbPrev.impresiones) : null,
+      deltaLabel: deltaVs,
+    },
+    {
+      label: "Conversaciones desde FB",
+      value: fNumber(pautaFb.conversaciones),
+      delta: pautaFbPrev ? calcDelta(pautaFb.conversaciones, pautaFbPrev.conversaciones) : null,
+      deltaLabel: deltaVs,
+    },
+    {
+      label: "Gasto en FB",
+      value: fCurrency(pautaFb.gasto),
+      delta: pautaFbPrev ? calcDelta(pautaFb.gasto, pautaFbPrev.gasto) : null,
+      deltaLabel: deltaVs,
+    },
+    {
+      label: "Costo x 1.000 personas",
+      value: pautaFb.alcance > 0 ? fCurrency((pautaFb.gasto / pautaFb.alcance) * 1000) : "—",
+      delta: pautaFbPrev && pautaFbPrev.alcance > 0 && pautaFb.alcance > 0
+        ? calcDelta(pautaFb.gasto / pautaFb.alcance, pautaFbPrev.gasto / pautaFbPrev.alcance)
+        : null,
+      deltaLabel: deltaVs,
+    },
+    {
+      label: "Seguidores de la página",
+      value: fNumber(fb?.seguidores || 0),
+      deltaText: "Total actual",
+    },
+  ] : [];
+
   const kpisIg = ig ? [
     {
       label: "Alcance",
@@ -394,6 +438,11 @@ export default function Redes() {
               </span>
             </div>
           </header>
+          {kpisFb.length > 0 && (
+            <section className="kpi-grid" style={{ marginBottom: 16 }}>
+              {kpisFb.map((kpi) => <KPI key={kpi.label} {...kpi} />)}
+            </section>
+          )}
           {pauta.length ? (
             <div className="table-wrap">
               <table>
