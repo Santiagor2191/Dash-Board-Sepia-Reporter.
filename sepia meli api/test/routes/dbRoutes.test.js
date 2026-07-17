@@ -64,3 +64,105 @@ test("db routes devuelven 500 cuando el servicio falla", async (t) => {
   assert.equal(ventas.data.mensaje, "No se pudo consultar la base de datos");
   assert.equal("detalle" in ventas.data, false);
 });
+
+// Fake mínimo de dbPool para las rutas de Social Media (solo lectura +
+// CRUD de competidores). Simula tablas en memoria.
+const makeFakeDbPool = () => {
+  const posts = [
+    { plataforma: "instagram", account_id: "ig1", post_id: "p1", fecha_publicacion: "2026-07-15", permalink: "x", miniatura_url: "y", media_type: "IMAGE", media_product_type: "FEED", caption: "hola", likes: 10, comentarios: 2, reach: 500, saves: 3, shares: 1, synced_at: "2026-07-17" },
+  ];
+  let competidores = [
+    { id: 1, plataforma: "instagram", handle: "compa", nombre_visible: "Comp A", activo: true, last_error: null, last_synced_at: null },
+  ];
+  let nextId = 2;
+
+  return {
+    query: async (sql, params = []) => {
+      if (sql.includes("FROM social_posts")) return [posts];
+      if (sql.includes("FROM competidores_social c")) return [competidores.map((c) => ({ ...c, competidor_id: c.id, seguidores: null, posts_count: null, engagement_aprox: null, cadencia_semanal: null, fecha_snapshot: null }))];
+      if (sql.startsWith("SELECT id, plataforma, handle, nombre_visible, activo")) return [competidores];
+      if (sql.startsWith("INSERT INTO competidores_social")) {
+        const [plataforma, handle, nombreVisible] = params;
+        const existente = competidores.find((c) => c.plataforma === plataforma && c.handle === handle);
+        if (existente) {
+          existente.activo = true;
+          existente.nombre_visible = nombreVisible;
+          return [[existente]];
+        }
+        const nuevo = { id: nextId++, plataforma, handle, nombre_visible: nombreVisible, activo: true, last_error: null, last_synced_at: null };
+        competidores.push(nuevo);
+        return [[nuevo]];
+      }
+      if (sql.startsWith("UPDATE competidores_social SET")) {
+        const id = params[params.length - 1];
+        const comp = competidores.find((c) => c.id === id);
+        if (!comp) return [[]];
+        // Solo mirar la cláusula SET, no el RETURNING (que siempre menciona
+        // ambas columnas independientemente de cuáles se estén actualizando).
+        const setClause = sql.split("WHERE")[0];
+        const setsNombre = setClause.includes("nombre_visible");
+        const setsActivo = setClause.includes("activo");
+        let idx = 0;
+        if (setsNombre) comp.nombre_visible = params[idx++];
+        if (setsActivo) comp.activo = params[idx++];
+        return [[comp]];
+      }
+      return [[]];
+    },
+  };
+};
+
+test("GET /db/social-posts devuelve los posts sincronizados", async (t) => {
+  const router = createDbRouter({ dbPool: makeFakeDbPool() });
+  const server = await startServer({ mountPath: "/db", router });
+  t.after(async () => server.close());
+
+  const { response, data } = await requestJson(server.baseUrl, "/db/social-posts");
+  assert.equal(response.status, 200);
+  assert.equal(data.ok, true);
+  assert.equal(data.posts.length, 1);
+  assert.equal(data.posts[0].post_id, "p1");
+});
+
+test("GET /db/social-benchmark devuelve competidores activos", async (t) => {
+  const router = createDbRouter({ dbPool: makeFakeDbPool() });
+  const server = await startServer({ mountPath: "/db", router });
+  t.after(async () => server.close());
+
+  const { response, data } = await requestJson(server.baseUrl, "/db/social-benchmark");
+  assert.equal(response.status, 200);
+  assert.equal(data.competidores.length, 1);
+  assert.equal(data.competidores[0].handle, "compa");
+});
+
+test("POST /db/competidores-social normaliza el handle y valida plataforma", async (t) => {
+  const router = createDbRouter({ dbPool: makeFakeDbPool() });
+  const server = await startServer({ mountPath: "/db", router });
+  t.after(async () => server.close());
+
+  const malo = await requestJson(server.baseUrl, "/db/competidores-social", {
+    method: "POST",
+    body: { plataforma: "tiktok", handle: "x" },
+  });
+  assert.equal(malo.response.status, 400);
+
+  const bueno = await requestJson(server.baseUrl, "/db/competidores-social", {
+    method: "POST",
+    body: { plataforma: "instagram", handle: "@Compedor_Nuevo ", nombre_visible: "Competidor Nuevo" },
+  });
+  assert.equal(bueno.response.status, 201);
+  assert.equal(bueno.data.competidor.handle, "compedor_nuevo"); // sin @, minusculas, sin espacios
+});
+
+test("PUT /db/competidores-social/:id desactiva sin borrar histórico", async (t) => {
+  const router = createDbRouter({ dbPool: makeFakeDbPool() });
+  const server = await startServer({ mountPath: "/db", router });
+  t.after(async () => server.close());
+
+  const { response, data } = await requestJson(server.baseUrl, "/db/competidores-social/1", {
+    method: "PUT",
+    body: { activo: false },
+  });
+  assert.equal(response.status, 200);
+  assert.equal(data.competidor.activo, false);
+});

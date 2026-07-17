@@ -2,12 +2,25 @@ import { spawn } from "node:child_process";
 import { stat } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 
-const EXTRACTOR_PATH = fileURLToPath(
-  new URL("../../../scripts/extract_clientes_contabilidad.py", import.meta.url),
-);
+// El extractor de Python solo existe en la maquina local (junto al Excel).
+// En el bundle serverless de Netlify import.meta.url no es una URL valida y
+// esto explotaria al importar; ahi el path queda null y runProcess falla con
+// un error claro (el servicio cae al respaldo en PostgreSQL).
+const EXTRACTOR_PATH = (() => {
+  try {
+    return fileURLToPath(
+      new URL("../../../scripts/extract_clientes_contabilidad.py", import.meta.url),
+    );
+  } catch {
+    return null;
+  }
+})();
 
 const runProcess = ({ pythonBin, excelPath }) =>
   new Promise((resolve, reject) => {
+    if (!EXTRACTOR_PATH) {
+      return reject(new Error("Extractor de Python no disponible en este entorno"));
+    }
     const child = spawn(pythonBin, [EXTRACTOR_PATH, "--path", excelPath], {
       stdio: ["ignore", "pipe", "pipe"],
       windowsHide: true,

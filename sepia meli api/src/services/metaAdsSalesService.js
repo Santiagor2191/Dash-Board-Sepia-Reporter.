@@ -3,12 +3,23 @@ import { stat } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 
 const TABLE_NAME = "ventas_meta_ads_mensual";
-const EXTRACTOR_PATH = fileURLToPath(
-  new URL("../../../scripts/carga_ventas_meta_ads.py", import.meta.url),
-);
+// Igual que en clientesContabilidadService: el script de Python solo existe
+// en la maquina local; en el bundle serverless este path queda null.
+const EXTRACTOR_PATH = (() => {
+  try {
+    return fileURLToPath(
+      new URL("../../../scripts/carga_ventas_meta_ads.py", import.meta.url),
+    );
+  } catch {
+    return null;
+  }
+})();
 
 const runExtractor = ({ pythonBin, excelPath }) =>
   new Promise((resolve, reject) => {
+    if (!EXTRACTOR_PATH) {
+      return reject(new Error("Extractor de Python no disponible en este entorno"));
+    }
     const child = spawn(pythonBin, [EXTRACTOR_PATH, "--path", excelPath], {
       stdio: ["ignore", "pipe", "pipe"],
       windowsHide: true,

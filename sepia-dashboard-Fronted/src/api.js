@@ -114,3 +114,11 @@ export const getRentabilidadCostoPorVentas = () => request("/api/rentabilidad/co
 export const getRentabilidadCostosMap = () => request("/api/rentabilidad/costos-map");
 export const postSyncAhora = () => request("/admin/sync-ahora", { method: "POST" });
 export const getSyncLog = (limit = 20) => request(`/admin/sync-log?limit=${limit}`);
+
+export const getSocialPosts = (limit = 50) => request(`/db/social-posts?limit=${limit}`);
+export const getSocialBenchmark = () => request("/db/social-benchmark");
+export const getCompetidoresSocial = () => request("/db/competidores-social");
+export const createCompetidorSocial = (competidor) =>
+  request("/db/competidores-social", { method: "POST", body: JSON.stringify(competidor) });
+export const updateCompetidorSocial = (id, cambios) =>
+  request(`/db/competidores-social/${id}`, { method: "PUT", body: JSON.stringify(cambios) });

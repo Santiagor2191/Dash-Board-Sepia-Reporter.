@@ -2,6 +2,10 @@ import crypto from "node:crypto";
 import dotenv from "dotenv";
 
 dotenv.config();
+// En Netlify Dev el proceso corre desde la carpeta del frontend y el .env del
+// backend queda al lado. dotenv nunca pisa variables ya cargadas, asi que este
+// segundo intento es inofensivo en Render y en local.
+dotenv.config({ path: "../sepia meli api/.env" });
 
 const toNumber = (value, fallback) => {
   const parsed = Number(value);

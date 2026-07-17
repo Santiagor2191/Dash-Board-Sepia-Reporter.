@@ -1,4 +1,5 @@
 import axios from "axios";
+import { createTtlCache } from "../utils/ttlCache.js";
 
 const GRAPH_BASE = "https://graph.facebook.com/v23.0";
 const CACHE_TTL_MS = 15 * 60 * 1000;
@@ -9,6 +10,10 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 // ponytail: si el rango pedido es más largo, se recorta a los últimos 30 días
 // (el payload lo informa); si algún día se necesita más, se trocea en ventanas.
 const MAX_IG_DAYS = 30;
+
+// Tope de posts por corrida de sync — evita pedir insights de a cientos de
+// posts de una y pegarle al límite de la API de Meta sin necesidad.
+const MAX_POSTS_POR_SYNC = 50;
 
 const fmtYmd = (d) => d.toISOString().slice(0, 10);
 
@@ -33,7 +38,7 @@ const friendlyGraphError = (error) => {
 };
 
 export const createMetaSocialService = ({ accessToken, adAccountId }) => {
-  const cache = new Map(); // "since:until" -> { data, at }
+  const cache = createTtlCache({ ttlMs: CACHE_TTL_MS });
 
   const graphGet = async (path, params = {}, token = accessToken) => {
     const { data } = await axios.get(`${GRAPH_BASE}/${path}`, {
@@ -41,6 +46,44 @@ export const createMetaSocialService = ({ accessToken, adAccountId }) => {
       timeout: 30_000,
     });
     return data;
+  };
+
+  // Llamadas agrupadas en un solo pedido HTTP (batch de Meta). Cada item de
+  // `requests` es { method, relative_url }; la respuesta trae un array en el
+  // mismo orden, cada uno con { code, body } — un item puede fallar sin tirar
+  // abajo a los demás (por eso el caller debe revisar `code` por separado).
+  const graphBatch = async (requests, token = accessToken) => {
+    if (!requests.length) return [];
+    const { data } = await axios.post(
+      GRAPH_BASE,
+      new URLSearchParams({
+        access_token: token,
+        batch: JSON.stringify(requests),
+      }),
+      { timeout: 30_000 },
+    );
+    return data || [];
+  };
+
+  const parseBatchJson = (item) => {
+    if (!item || item.code !== 200) return null;
+    try {
+      return JSON.parse(item.body);
+    } catch {
+      return null;
+    }
+  };
+
+  // Resuelve la Página de Facebook con Instagram vinculado (se reusa tanto
+  // para el resumen en vivo del dashboard como para el sync a Neon).
+  const resolvePageAndIg = async () => {
+    const accounts = await graphGet("me/accounts", {
+      fields:
+        "id,name,access_token,fan_count,followers_count,instagram_business_account{id,username,followers_count,media_count,profile_picture_url}",
+    });
+    const pages = accounts.data || [];
+    const page = pages.find((p) => p.instagram_business_account) || pages[0];
+    return { page, ig: page?.instagram_business_account || null };
   };
 
   // Totales de IG para una ventana de fechas (se usa para el periodo actual y el anterior)
@@ -58,16 +101,8 @@ export const createMetaSocialService = ({ accessToken, adAccountId }) => {
     ]);
 
   const fetchFresh = async (since, until, recortado) => {
-    // Página con Instagram vinculado (Sepia Moda y Más)
-    const accounts = await graphGet("me/accounts", {
-      fields:
-        "id,name,access_token,fan_count,followers_count,instagram_business_account{id,username,followers_count,media_count,profile_picture_url}",
-    });
-    const pages = accounts.data || [];
-    const page = pages.find((p) => p.instagram_business_account) || pages[0];
+    const { page, ig } = await resolvePageAndIg();
     if (!page) return { configured: true, error: "El token no tiene acceso a ninguna página de Facebook." };
-
-    const ig = page.instagram_business_account;
 
     // Ventana anterior de igual duración, para los % de cambio
     const dias = Math.round((new Date(until) - new Date(since)) / DAY_MS) + 1;
@@ -189,21 +224,165 @@ export const createMetaSocialService = ({ accessToken, adAccountId }) => {
 
     const cacheKey = `${desde}:${hasta}`;
     const cached = cache.get(cacheKey);
-    if (cached && Date.now() - cached.at < CACHE_TTL_MS) {
+    if (cached?.fresh) {
       // El flag "recortado" depende del rango pedido, no del cacheado
       return { ...cached.data, periodo: { ...cached.data.periodo, recortado } };
     }
 
     try {
       const data = await fetchFresh(desde, hasta, recortado);
-      if (cache.size > 30) cache.clear();
-      cache.set(cacheKey, { data, at: Date.now() });
+      cache.set(cacheKey, data);
       return data;
     } catch (error) {
-      if (cached) return cached.data;
+      if (cached) return cached.data; // dato vencido como respaldo, mejor que nada
       return { configured: true, error: friendlyGraphError(error) };
     }
   };
 
-  return { getSocial };
+  // ---------------------------------------------------------------------
+  // Fetchers "crudos" para el job de sync (socialSyncService.js). A
+  // diferencia de getSocial(), no truncan ni dan formato de UI — devuelven
+  // los datos tal cual hacen falta para persistir en social_posts.
+  // ---------------------------------------------------------------------
+
+  // Posts propios (IG + FB) con insights por post, vía batch request (1A).
+  // No usa el cache (el sync corre una vez al día, no tiene sentido cachear).
+  const fetchPostsForSync = async () => {
+    if (!accessToken) {
+      return { configured: false, mensaje: "Falta META_ACCESS_TOKEN en el .env del backend." };
+    }
+
+    const { page, ig } = await resolvePageAndIg();
+    if (!page) return { configured: true, error: "El token no tiene acceso a ninguna página de Facebook." };
+
+    const [igMedia, fbPosts] = await Promise.all([
+      ig
+        ? graphGet(`${ig.id}/media`, {
+            fields:
+              "caption,media_type,media_product_type,media_url,thumbnail_url,timestamp,permalink,like_count,comments_count",
+            limit: MAX_POSTS_POR_SYNC,
+          }).catch(() => null)
+        : null,
+      graphGet(`${page.id}/published_posts`, {
+        fields: "message,created_time,permalink_url,full_picture,likes.summary(true),comments.summary(true)",
+        limit: MAX_POSTS_POR_SYNC,
+      }, page.access_token).catch(() => null),
+    ]);
+
+    const igItems = igMedia?.data || [];
+    // reach/saved/shares vienen en una llamada de insights APARTE por post —
+    // se piden todas juntas en un solo batch request (decisión 1A).
+    const insightsBatch = igItems.length
+      ? await graphBatch(
+          igItems.map((m) => ({
+            method: "GET",
+            relative_url: `${m.id}/insights?metric=reach,saved,shares`,
+          })),
+        ).catch(() => [])
+      : [];
+
+    const igPosts = igItems.map((m, idx) => {
+      const insights = parseBatchJson(insightsBatch[idx]);
+      const metricValue = (name) =>
+        Number((insights?.data || []).find((row) => row.name === name)?.values?.[0]?.value) || null;
+      return {
+        plataforma: "instagram",
+        account_id: ig.id,
+        post_id: m.id,
+        fecha_publicacion: m.timestamp || null,
+        permalink: m.permalink || null,
+        miniatura_url: m.thumbnail_url || m.media_url || null,
+        media_type: m.media_type || null,
+        media_product_type: m.media_product_type || null,
+        caption: m.caption || null,
+        likes: Number(m.like_count) || 0,
+        comentarios: Number(m.comments_count) || 0,
+        // null (no undefined) cuando el insight puntual falló — así el sync
+        // guarda "no disponible" en vez de perder la fila entera.
+        reach: metricValue("reach"),
+        saves: metricValue("saved"),
+        shares: metricValue("shares"),
+      };
+    });
+
+    const fbItems = fbPosts?.data || [];
+    const fbMapped = fbItems.map((p) => ({
+      plataforma: "facebook",
+      account_id: page.id,
+      post_id: p.id,
+      fecha_publicacion: p.created_time || null,
+      permalink: p.permalink_url || null,
+      miniatura_url: p.full_picture || null,
+      media_type: null,
+      media_product_type: null,
+      caption: p.message || null,
+      likes: Number(p.likes?.summary?.total_count) || 0,
+      comentarios: Number(p.comments?.summary?.total_count) || 0,
+      // Facebook no expone reach/saves/shares por post orgánico vía Graph API
+      // pública desde que Meta retiró las métricas orgánicas de página.
+      reach: null,
+      saves: null,
+      shares: null,
+    }));
+
+    return { configured: true, posts: [...igPosts, ...fbMapped] };
+  };
+
+  // Benchmark de un competidor. Instagram vía Business Discovery (no
+  // requiere autorización del competidor); Facebook solo seguidores
+  // (dato público). Se llama una vez por competidor activo desde
+  // socialSyncService.js, que aísla los errores de cada uno (3A).
+  const fetchCompetitorBenchmark = async ({ plataforma, handle }) => {
+    if (!accessToken) throw new Error("Falta META_ACCESS_TOKEN en el .env del backend.");
+
+    if (plataforma === "instagram") {
+      const { ig } = await resolvePageAndIg();
+      if (!ig) throw new Error("No hay cuenta de Instagram vinculada para consultar Business Discovery.");
+      const data = await graphGet(`${ig.id}`, {
+        fields: `business_discovery.username(${handle}){followers_count,media_count,media.limit(12){like_count,comments_count,timestamp}}`,
+      });
+      const bd = data?.business_discovery;
+      if (!bd) throw new Error(`No se encontró la cuenta @${handle} (¿no es una cuenta Business/Creator?).`);
+      const posts = bd.media?.data || [];
+      const totalLikesComments = posts.reduce(
+        (acc, p) => acc + (Number(p.like_count) || 0) + (Number(p.comments_count) || 0),
+        0,
+      );
+      const seguidores = Number(bd.followers_count) || 0;
+      const engagementAprox = seguidores > 0 && posts.length ? totalLikesComments / posts.length / seguidores : null;
+      const cadenciaSemanal = computeCadenciaSemanal(posts.map((p) => p.timestamp));
+      return {
+        seguidores,
+        posts_count: Number(bd.media_count) || 0,
+        engagement_aprox: engagementAprox,
+        cadencia_semanal: cadenciaSemanal,
+      };
+    }
+
+    if (plataforma === "facebook") {
+      // Dato público, no requiere permisos especiales sobre la página ajena.
+      const data = await graphGet(handle, { fields: "followers_count,fan_count" });
+      return {
+        seguidores: Number(data.followers_count || data.fan_count) || 0,
+        posts_count: null,
+        engagement_aprox: null,
+        cadencia_semanal: null,
+      };
+    }
+
+    throw new Error(`Plataforma desconocida: ${plataforma}`);
+  };
+
+  return { getSocial, fetchPostsForSync, fetchCompetitorBenchmark };
+};
+
+// Posts por semana en las últimas ~4 semanas de la muestra traída (no es un
+// promedio histórico real, es una aproximación con lo poco que Business
+// Discovery entrega — documentado como tal en el design doc).
+const computeCadenciaSemanal = (timestamps) => {
+  const fechas = timestamps.filter(Boolean).map((t) => new Date(t).getTime());
+  if (fechas.length < 2) return null;
+  const rangoDias = (Math.max(...fechas) - Math.min(...fechas)) / DAY_MS;
+  if (rangoDias <= 0) return null;
+  return Number(((fechas.length / rangoDias) * 7).toFixed(2));
 };

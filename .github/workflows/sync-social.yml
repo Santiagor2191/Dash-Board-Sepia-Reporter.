@@ -1,0 +1,36 @@
+name: Sync Social Media Sepia
+
+# Sincroniza posts propios (IG/FB) + benchmark de competidores a Neon.
+# Mismo patrón que sync-nocturno.yml — funciona hoy contra Render y va a
+# seguir funcionando igual cuando el backend migre a Netlify Functions
+# (solo cambia la URL del paso de abajo, node-cron no se usa acá a propósito).
+
+on:
+  schedule:
+    # 4:00 AM hora Colombia (UTC-5) = 9:00 AM UTC — corre después del sync de
+    # ventas para no competir por recursos al mismo tiempo.
+    - cron: '0 9 * * *'
+  workflow_dispatch: # permite lanzar manual desde GitHub Actions (disparo manual, decisión 1E)
+
+jobs:
+  social-sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Disparar sync social en backend
+        run: |
+          echo "Llamando a POST /cron/social-sync en $(date -u)"
+          HTTP_STATUS=$(curl -s -o /tmp/response.json -w "%{http_code}" \
+            -X POST https://dashboard-sepia-inventario.onrender.com/cron/social-sync \
+            -H "x-cron-secret: ${{ secrets.CRON_SECRET }}" \
+            -H "Content-Type: application/json" \
+            --max-time 300)
+          echo "HTTP Status: $HTTP_STATUS"
+          echo "Respuesta:"
+          cat /tmp/response.json
+          # 200 = sync ok, 409 = ya habia un sync corriendo (no es error)
+          if [ "$HTTP_STATUS" != "200" ] && [ "$HTTP_STATUS" != "409" ]; then
+            echo "Error inesperado: HTTP $HTTP_STATUS"
+            exit 1
+          fi

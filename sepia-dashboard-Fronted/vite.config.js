@@ -8,4 +8,11 @@ export default defineConfig({
     port: 5173,
     strictPort: true,
   },
+  // Vite soporta la config de test embebida acá — evita mantener un
+  // vitest.config.js aparte que duplicaría el plugin de React.
+  test: {
+    environment: 'jsdom',
+    setupFiles: ['./src/test/setup.js'],
+    globals: true,
+  },
 })

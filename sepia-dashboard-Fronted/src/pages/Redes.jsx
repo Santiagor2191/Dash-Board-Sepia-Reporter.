@@ -10,8 +10,118 @@ import {
 } from "recharts";
 import KPI from "../components/KPI";
 import MetaDateRangePicker from "../components/MetaDateRangePicker";
-import { getMetaRedes } from "../api";
+import HeatmapTable from "../components/HeatmapTable";
+import CompetidoresEditor from "../components/CompetidoresEditor";
+import { getMetaRedes, getSocialPosts, getSocialBenchmark } from "../api";
 import { calcDelta, fCurrency, fNumber, fmtYmd, daysAgo, prettyDate } from "../utils";
+
+const TABS = [
+  { id: "resumen", label: "Resumen" },
+  { id: "posts", label: "Posts" },
+  { id: "competidores", label: "Competidores" },
+];
+
+const POST_COLUMNS = [
+  {
+    key: "miniatura_url",
+    label: "",
+    render: (value) =>
+      value ? <img src={value} alt="" width={40} height={40} style={{ borderRadius: 6, objectFit: "cover" }} /> : "—",
+  },
+  { key: "fecha_publicacion", label: "Fecha", render: (v) => (v ? String(v).slice(0, 10) : "—") },
+  { key: "plataforma", label: "Plataforma", render: (v) => (v === "instagram" ? "Instagram" : "Facebook") },
+  { key: "reach", label: "Reach", heatmap: true, align: "right" },
+  { key: "likes", label: "Likes", heatmap: true, align: "right" },
+  { key: "comentarios", label: "Comentarios", heatmap: true, align: "right" },
+  { key: "saves", label: "Saves", heatmap: true, align: "right" },
+  { key: "shares", label: "Shares", heatmap: true, align: "right" },
+];
+
+// Tabla de posts propios con heatmap — pestaña "Posts". Se carga solo
+// cuando la pestaña está activa (no gasta una consulta si nunca se abre).
+const PostsTab = () => {
+  const [posts, setPosts] = useState(null);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    getSocialPosts()
+      .then((payload) => { if (!cancelled) setPosts(payload.posts || []); })
+      .catch((err) => { if (!cancelled) setError(err?.message || "No se pudieron cargar los posts."); });
+    return () => { cancelled = true; };
+  }, []);
+
+  if (error) return <div className="empty-state">{error}</div>;
+  if (posts === null) return <div className="empty-state">Cargando posts...</div>;
+
+  return (
+    <section className="panel">
+      <header className="panel-head">
+        <h2>Posts publicados</h2>
+        <span>Con heatmap por columna — el color más intenso marca el valor más alto de esa métrica</span>
+      </header>
+      <HeatmapTable
+        columns={POST_COLUMNS}
+        rows={posts}
+        getRowKey={(row) => `${row.plataforma}:${row.account_id}:${row.post_id}`}
+        emptyMessage="Todavía no hay posts sincronizados. El sync corre una vez al día — si acabás de configurar esto, esperá al próximo /cron/social-sync."
+      />
+    </section>
+  );
+};
+
+// Benchmark de competidores + editor — pestaña "Competidores".
+const CompetidoresTab = () => {
+  const [benchmark, setBenchmark] = useState(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    getSocialBenchmark()
+      .then((payload) => { if (!cancelled) setBenchmark(payload.competidores || []); })
+      .catch(() => { if (!cancelled) setBenchmark([]); });
+    return () => { cancelled = true; };
+  }, []);
+
+  return (
+    <>
+      {benchmark && benchmark.length > 0 && (
+        <section className="panel" style={{ marginBottom: 14 }}>
+          <header className="panel-head">
+            <h2>Benchmark</h2>
+            <span>Instagram: seguidores + cadencia + engagement aproximado · Facebook: solo seguidores</span>
+          </header>
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Competidor</th>
+                  <th>Plataforma</th>
+                  <th style={{ textAlign: "right" }}>Seguidores</th>
+                  <th style={{ textAlign: "right" }}>Posts/semana</th>
+                  <th style={{ textAlign: "right" }}>Engagement aprox.</th>
+                </tr>
+              </thead>
+              <tbody>
+                {benchmark.map((c) => (
+                  <tr key={c.competidor_id}>
+                    <td>{c.nombre_visible || c.handle}</td>
+                    <td>{c.plataforma === "instagram" ? "Instagram" : "Facebook"}</td>
+                    <td style={{ textAlign: "right" }}>{c.seguidores != null ? fNumber(c.seguidores) : "—"}</td>
+                    <td style={{ textAlign: "right" }}>{c.cadencia_semanal ?? "—"}</td>
+                    <td style={{ textAlign: "right" }}>
+                      {c.engagement_aprox != null ? `${(c.engagement_aprox * 100).toFixed(1)}%` : "—"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
+      <CompetidoresEditor />
+    </>
+  );
+};
 
 const DEFAULT_RANGE = () => ({
   presetId: "30d",
@@ -134,6 +244,7 @@ export default function Redes() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [range, setRange] = useState(DEFAULT_RANGE);
+  const [tab, setTab] = useState("resumen");
 
   useEffect(() => {
     let cancelled = false;
@@ -213,10 +324,30 @@ export default function Redes() {
     </section>
   );
 
-  if (loading) return <>{header}<div className="empty-state">Consultando redes en Meta...</div></>;
+  const tabBar = (
+    <div className="tabs">
+      {TABS.map((t) => (
+        <button
+          key={t.id}
+          type="button"
+          className={`tab-btn ${tab === t.id ? "active" : ""}`}
+          onClick={() => setTab(t.id)}
+        >
+          {t.label}
+        </button>
+      ))}
+    </div>
+  );
+
+  // Posts y Competidores tienen su propia carga de datos, independiente del
+  // resumen en vivo de Meta — no hace falta esperar a que "data" resuelva.
+  if (tab === "posts") return <>{header}{tabBar}<PostsTab /></>;
+  if (tab === "competidores") return <>{header}{tabBar}<CompetidoresTab /></>;
+
+  if (loading) return <>{header}{tabBar}<div className="empty-state">Consultando redes en Meta...</div></>;
   if (!data) return null;
   if (data.configured === false || data.error) {
-    return <>{header}<div className="empty-state">{data.mensaje || data.error}</div></>;
+    return <>{header}{tabBar}<div className="empty-state">{data.mensaje || data.error}</div></>;
   }
 
   const deltaVs = "vs periodo anterior";
@@ -305,6 +436,7 @@ export default function Redes() {
   return (
     <>
       {header}
+      {tabBar}
 
       {ig ? (
         <>
