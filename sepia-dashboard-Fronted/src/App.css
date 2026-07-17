@@ -988,6 +988,169 @@ tbody tr:hover {
   .topbar-right { width: 100%; justify-content: flex-start; }
 }
 
+/* --- Perfiles de competidores (pestaña Competidores) --- */
+
+.profile-chip-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+}
+
+.profile-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px 6px 6px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--glass);
+  color: var(--muted);
+  font-size: 0.82rem;
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+}
+
+.profile-chip:hover {
+  color: var(--text);
+  border-color: var(--accent);
+}
+
+.profile-chip.active {
+  color: var(--text);
+  border-color: var(--accent);
+  background: var(--accent-muted);
+  font-weight: 600;
+}
+
+.avatar-circle {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  font-family: "Space Grotesk", sans-serif;
+  font-weight: 600;
+  color: #fff;
+}
+
+.avatar-circle.sm { width: 26px; height: 26px; font-size: 0.72rem; }
+.avatar-circle.lg { width: 56px; height: 56px; font-size: 1.3rem; }
+
+.profile-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 24px;
+}
+
+.profile-identity {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.profile-identity h3 {
+  margin: 0;
+  font-family: "Space Grotesk", sans-serif;
+  font-size: 1.1rem;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.profile-identity p {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+  max-width: 46ch;
+}
+
+.pill.brand {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: var(--accent-muted);
+  font-weight: 600;
+}
+
+.platform-section {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 14px;
+}
+
+.platform-card {
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background: rgba(148, 163, 184, 0.05);
+  padding: 16px;
+}
+
+.platform-card-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  font-family: "Space Grotesk", sans-serif;
+  font-size: 0.9rem;
+}
+
+.platform-tag {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 26px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 6px;
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.platform-tag.instagram { background: rgba(236, 72, 153, 0.16); color: #ec4899; }
+.platform-tag.facebook { background: rgba(59, 130, 246, 0.16); color: #3b82f6; }
+
+.profile-metric-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  gap: 8px;
+}
+
+.profile-metric {
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  padding: 8px 10px;
+  background: rgba(148, 163, 184, 0.06);
+}
+
+.profile-metric-label {
+  color: var(--muted);
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.profile-metric-value {
+  font-family: "Space Grotesk", sans-serif;
+  font-size: 1rem;
+  margin-top: 3px;
+}
+
+.profile-metric-value.unavailable {
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-family: inherit;
+}
+
+.platform-card-note {
+  margin: 10px 0 0;
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+
 @media (max-width: 640px) {
   .content { padding: 14px; }
   .kpi-grid { grid-template-columns: 1fr; }
@@ -1006,6 +1169,8 @@ tbody tr:hover {
     left: 0;
     right: auto;
   }
+  .profile-card-header { flex-direction: column; align-items: stretch; }
+  .avatar-circle.lg { width: 48px; height: 48px; font-size: 1.1rem; }
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -71,54 +71,199 @@ const PostsTab = () => {
 };
 
 // Benchmark de competidores + editor — pestaña "Competidores".
-const CompetidoresTab = () => {
-  const [benchmark, setBenchmark] = useState(null);
+// Misma paleta ya usada para años en VentasMetaAds.jsx — la reusamos para que
+// cada perfil tenga un color de avatar estable y consistente con el resto del
+// dashboard, en vez de inventar una paleta nueva para esto solo.
+const AVATAR_PALETTE = ["#0ea5e9", "#22c55e", "#f59e0b", "#ec4899", "#8b5cf6", "#14b8a6", "#fb7185", "#6366f1"];
+
+const avatarColorFor = (key) => {
+  let hash = 0;
+  for (let i = 0; i < key.length; i++) hash = key.charCodeAt(i) + ((hash << 5) - hash);
+  return AVATAR_PALETTE[Math.abs(hash) % AVATAR_PALETTE.length];
+};
+
+const initialOf = (name) => (name || "?").trim().charAt(0).toUpperCase() || "?";
+
+const fPercent = (v) => (v != null ? `${(v * 100).toFixed(1)}%` : null);
+
+// La base de datos guarda un competidor+plataforma por fila (decisión del
+// eng-review: no hay concepto de "perfil" unico). Acá se agrupan por nombre
+// visible (o handle si no tiene nombre) SOLO para mostrar, sin tocar el dato
+// real — si Santiago carga el mismo nombre en Instagram y Facebook, las 2
+// filas se ven como un solo perfil con 2 plataformas adentro.
+const buildProfiles = (competidores) => {
+  const map = new Map();
+  (competidores || []).forEach((c) => {
+    const nombre = (c.nombre_visible || c.handle || "").trim();
+    const key = nombre.toLowerCase();
+    if (!key) return;
+    if (!map.has(key)) map.set(key, { id: key, nombre, plataformas: {} });
+    map.get(key).plataformas[c.plataforma] = c;
+  });
+  return [...map.values()];
+};
+
+// "Tu marca" se arma con los datos que YA se cargaron para la pestaña
+// Resumen (ig/fb) — no dispara una consulta nueva. Reusa la misma cuenta de
+// cadencia semanal que ya se calcula para las Recomendaciones, para que el
+// numero sea comparable con lo que muestran los competidores.
+const buildTuMarcaProfile = (ig, fb) => {
+  if (!ig && !fb) return null;
+  const plataformas = {};
+  if (ig) {
+    plataformas.instagram = {
+      seguidores: ig.seguidores,
+      engagement_aprox: ig.alcance > 0 ? ig.interacciones / ig.alcance : null,
+      posts_count: ig.publicaciones_total,
+      cadencia_semanal: cadenciaSemanalDePosts(ig.posts),
+    };
+  }
+  if (fb) {
+    plataformas.facebook = {
+      seguidores: fb.seguidores,
+      engagement_aprox: null,
+      posts_count: null,
+      cadencia_semanal: null,
+    };
+  }
+  return { id: "__tu_marca__", nombre: ig?.username ? `@${ig.username}` : "Sepia", esTuMarca: true, plataformas };
+};
+
+const PLATFORM_LABEL = { instagram: "Instagram", facebook: "Facebook" };
+const PLATFORM_TAG = { instagram: "IG", facebook: "FB" };
+
+const PlatformCard = ({ plataforma, datos }) => {
+  const metricas = [
+    { label: "Seguidores", value: datos.seguidores != null ? fNumber(datos.seguidores) : null },
+    { label: "Engagement", value: fPercent(datos.engagement_aprox) },
+    { label: "Posts/semana", value: datos.cadencia_semanal ?? null },
+    { label: "Publicaciones", value: datos.posts_count != null ? fNumber(datos.posts_count) : null },
+  ];
+  const faltanDatos = metricas.every((m, i) => i === 0 || m.value == null);
+
+  return (
+    <div className="platform-card">
+      <div className="platform-card-head">
+        <span className={`platform-tag ${plataforma}`}>{PLATFORM_TAG[plataforma]}</span>
+        {PLATFORM_LABEL[plataforma]}
+      </div>
+      <div className="profile-metric-grid">
+        {metricas.map((m) => (
+          <div className="profile-metric" key={m.label}>
+            <div className="profile-metric-label">{m.label}</div>
+            <div className={`profile-metric-value ${m.value == null ? "unavailable" : ""}`}>
+              {m.value ?? "—"}
+            </div>
+          </div>
+        ))}
+      </div>
+      {plataforma === "facebook" && faltanDatos && (
+        <p className="platform-card-note">
+          Meta solo entrega seguidores de páginas ajenas sin un trámite de revisión aparte — el resto de las métricas no está disponible.
+        </p>
+      )}
+      {datos.last_error && (
+        <p className="platform-card-note">Sin sincronizar: {datos.last_error}</p>
+      )}
+    </div>
+  );
+};
+
+const CompetidoresTab = ({ ig, fb }) => {
+  const [competidores, setCompetidores] = useState(null);
+  const [seleccionado, setSeleccionado] = useState(null);
+  const [gestionAbierta, setGestionAbierta] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
     getSocialBenchmark()
-      .then((payload) => { if (!cancelled) setBenchmark(payload.competidores || []); })
-      .catch(() => { if (!cancelled) setBenchmark([]); });
+      .then((payload) => { if (!cancelled) setCompetidores(payload.competidores || []); })
+      .catch(() => { if (!cancelled) setCompetidores([]); });
     return () => { cancelled = true; };
   }, []);
 
+  const tuMarca = useMemo(() => buildTuMarcaProfile(ig, fb), [ig, fb]);
+  const perfiles = useMemo(() => {
+    const propios = buildProfiles(competidores);
+    return tuMarca ? [tuMarca, ...propios] : propios;
+  }, [competidores, tuMarca]);
+
+  if (competidores === null) return <div className="empty-state">Cargando competidores...</div>;
+
+  const activo = perfiles.find((p) => p.id === seleccionado) || perfiles[0] || null;
+
   return (
     <>
-      {benchmark && benchmark.length > 0 && (
-        <section className="panel" style={{ marginBottom: 14 }}>
-          <header className="panel-head">
-            <h2>Benchmark</h2>
-            <span>Instagram: seguidores + cadencia + engagement aproximado · Facebook: solo seguidores</span>
-          </header>
-          <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Competidor</th>
-                  <th>Plataforma</th>
-                  <th style={{ textAlign: "right" }}>Seguidores</th>
-                  <th style={{ textAlign: "right" }}>Posts/semana</th>
-                  <th style={{ textAlign: "right" }}>Engagement aprox.</th>
-                </tr>
-              </thead>
-              <tbody>
-                {benchmark.map((c) => (
-                  <tr key={c.competidor_id}>
-                    <td>{c.nombre_visible || c.handle}</td>
-                    <td>{c.plataforma === "instagram" ? "Instagram" : "Facebook"}</td>
-                    <td style={{ textAlign: "right" }}>{c.seguidores != null ? fNumber(c.seguidores) : "—"}</td>
-                    <td style={{ textAlign: "right" }}>{c.cadencia_semanal ?? "—"}</td>
-                    <td style={{ textAlign: "right" }}>
-                      {c.engagement_aprox != null ? `${(c.engagement_aprox * 100).toFixed(1)}%` : "—"}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+      <section className="panel" style={{ marginBottom: 14 }}>
+        <header className="panel-head">
+          <div>
+            <h2>Competidores</h2>
+            <span>Instagram completo · Facebook solo seguidores</span>
           </div>
-        </section>
-      )}
-      <CompetidoresEditor />
+          <button type="button" className="btn-xs" onClick={() => setGestionAbierta((v) => !v)}>
+            {gestionAbierta ? "Ocultar gestión" : "+ Agregar / gestionar"}
+          </button>
+        </header>
+
+        {perfiles.length === 0 ? (
+          <div className="empty-state">
+            Todavía no cargaste competidores. Usá "+ Agregar / gestionar" arriba para empezar a compararte.
+          </div>
+        ) : (
+          <>
+            <div className="profile-chip-row">
+              {perfiles.map((p) => (
+                <button
+                  key={p.id}
+                  type="button"
+                  className={`profile-chip ${activo?.id === p.id ? "active" : ""}`}
+                  onClick={() => setSeleccionado(p.id)}
+                >
+                  <span
+                    className="avatar-circle sm"
+                    style={{ background: p.esTuMarca ? "var(--accent)" : avatarColorFor(p.id) }}
+                  >
+                    {initialOf(p.nombre)}
+                  </span>
+                  {p.nombre}
+                </button>
+              ))}
+            </div>
+
+            {activo && (
+              <>
+                <div className="profile-card-header">
+                  <div className="profile-identity">
+                    <span
+                      className="avatar-circle lg"
+                      style={{ background: activo.esTuMarca ? "var(--accent)" : avatarColorFor(activo.id) }}
+                    >
+                      {initialOf(activo.nombre)}
+                    </span>
+                    <div>
+                      <h3>
+                        {activo.nombre}
+                        {activo.esTuMarca && <span className="pill brand">Tu marca</span>}
+                      </h3>
+                      <p>
+                        {Object.keys(activo.plataformas).map((pl) => PLATFORM_LABEL[pl]).join(" · ") || "Sin plataformas cargadas"}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="platform-section">
+                  {Object.entries(activo.plataformas).map(([plataforma, datos]) => (
+                    <PlatformCard key={plataforma} plataforma={plataforma} datos={datos} />
+                  ))}
+                </div>
+              </>
+            )}
+          </>
+        )}
+      </section>
+
+      {gestionAbierta && <CompetidoresEditor />}
     </>
   );
 };
@@ -141,6 +286,16 @@ const tooltipStyle = {
 
 const TIPO_LABEL = { IMAGE: "Foto", VIDEO: "Video", CAROUSEL_ALBUM: "Carrusel" };
 const DAY_MS = 24 * 60 * 60 * 1000;
+
+// Posts por semana sobre los últimos 30 días de "posts" (usado tanto por las
+// Recomendaciones como por el perfil "Tu marca" en Competidores, para que el
+// número sea el mismo en los dos lados).
+const cadenciaSemanalDePosts = (posts) => {
+  const posts30 = (posts || []).filter(
+    (p) => new Date(p.fecha).getTime() > Date.now() - 30 * DAY_MS,
+  ).length;
+  return posts30 > 0 ? Number((posts30 / 4.3).toFixed(1)) : null;
+};
 
 // --- Recomendaciones calculadas con reglas sobre los datos reales ---
 // nivel: "bien" (verde, sigue así) | "accion" (ámbar, hay oportunidad)
@@ -342,7 +497,7 @@ export default function Redes() {
   // Posts y Competidores tienen su propia carga de datos, independiente del
   // resumen en vivo de Meta — no hace falta esperar a que "data" resuelva.
   if (tab === "posts") return <>{header}{tabBar}<PostsTab /></>;
-  if (tab === "competidores") return <>{header}{tabBar}<CompetidoresTab /></>;
+  if (tab === "competidores") return <>{header}{tabBar}<CompetidoresTab ig={ig} fb={fb} /></>;
 
   if (loading) return <>{header}{tabBar}<div className="empty-state">Consultando redes en Meta...</div></>;
   if (!data) return null;
