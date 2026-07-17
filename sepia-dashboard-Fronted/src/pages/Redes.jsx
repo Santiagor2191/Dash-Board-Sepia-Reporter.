@@ -192,78 +192,79 @@ const CompetidoresTab = ({ ig, fb }) => {
 
   const activo = perfiles.find((p) => p.id === seleccionado) || perfiles[0] || null;
 
+  // "Tu marca" no cuenta como competidor real — si todavía no cargaste
+  // ninguno, mostramos el formulario directo (sin el toggle de en medio),
+  // porque sin eso esta pestaña no tiene nada que comparar todavía.
+  const sinCompetidoresReales = (competidores?.length || 0) === 0;
+
   return (
     <>
-      <section className="panel" style={{ marginBottom: 14 }}>
-        <header className="panel-head">
-          <div>
-            <h2>Competidores</h2>
-            <span>Instagram completo · Facebook solo seguidores</span>
-          </div>
-          <button type="button" className="btn-xs" onClick={() => setGestionAbierta((v) => !v)}>
-            {gestionAbierta ? "Ocultar gestión" : "+ Agregar / gestionar"}
-          </button>
-        </header>
-
-        {perfiles.length === 0 ? (
-          <div className="empty-state">
-            Todavía no cargaste competidores. Usá "+ Agregar / gestionar" arriba para empezar a compararte.
-          </div>
-        ) : (
-          <>
-            <div className="profile-chip-row">
-              {perfiles.map((p) => (
-                <button
-                  key={p.id}
-                  type="button"
-                  className={`profile-chip ${activo?.id === p.id ? "active" : ""}`}
-                  onClick={() => setSeleccionado(p.id)}
-                >
-                  <span
-                    className="avatar-circle sm"
-                    style={{ background: p.esTuMarca ? "var(--accent)" : avatarColorFor(p.id) }}
-                  >
-                    {initialOf(p.nombre)}
-                  </span>
-                  {p.nombre}
-                </button>
-              ))}
+      {perfiles.length > 0 && (
+        <section className="panel" style={{ marginBottom: 14 }}>
+          <header className="panel-head">
+            <div>
+              <h2>Competidores</h2>
+              <span>Instagram completo · Facebook solo seguidores</span>
             </div>
+            {!sinCompetidoresReales && (
+              <button type="button" className="btn-xs" onClick={() => setGestionAbierta((v) => !v)}>
+                {gestionAbierta ? "Ocultar gestión" : "+ Agregar / gestionar"}
+              </button>
+            )}
+          </header>
 
-            {activo && (
-              <>
-                <div className="profile-card-header">
-                  <div className="profile-identity">
-                    <span
-                      className="avatar-circle lg"
-                      style={{ background: activo.esTuMarca ? "var(--accent)" : avatarColorFor(activo.id) }}
-                    >
-                      {initialOf(activo.nombre)}
-                    </span>
-                    <div>
-                      <h3>
-                        {activo.nombre}
-                        {activo.esTuMarca && <span className="pill brand">Tu marca</span>}
-                      </h3>
-                      <p>
-                        {Object.keys(activo.plataformas).map((pl) => PLATFORM_LABEL[pl]).join(" · ") || "Sin plataformas cargadas"}
-                      </p>
-                    </div>
+          <div className="profile-chip-row">
+            {perfiles.map((p) => (
+              <button
+                key={p.id}
+                type="button"
+                className={`profile-chip ${activo?.id === p.id ? "active" : ""}`}
+                onClick={() => setSeleccionado(p.id)}
+              >
+                <span
+                  className="avatar-circle sm"
+                  style={{ background: p.esTuMarca ? "var(--accent)" : avatarColorFor(p.id) }}
+                >
+                  {initialOf(p.nombre)}
+                </span>
+                {p.nombre}
+              </button>
+            ))}
+          </div>
+
+          {activo && (
+            <>
+              <div className="profile-card-header">
+                <div className="profile-identity">
+                  <span
+                    className="avatar-circle lg"
+                    style={{ background: activo.esTuMarca ? "var(--accent)" : avatarColorFor(activo.id) }}
+                  >
+                    {initialOf(activo.nombre)}
+                  </span>
+                  <div>
+                    <h3>
+                      {activo.nombre}
+                      {activo.esTuMarca && <span className="pill brand">Tu marca</span>}
+                    </h3>
+                    <p>
+                      {Object.keys(activo.plataformas).map((pl) => PLATFORM_LABEL[pl]).join(" · ") || "Sin plataformas cargadas"}
+                    </p>
                   </div>
                 </div>
+              </div>
 
-                <div className="platform-section">
-                  {Object.entries(activo.plataformas).map(([plataforma, datos]) => (
-                    <PlatformCard key={plataforma} plataforma={plataforma} datos={datos} />
-                  ))}
-                </div>
-              </>
-            )}
-          </>
-        )}
-      </section>
+              <div className="platform-section">
+                {Object.entries(activo.plataformas).map(([plataforma, datos]) => (
+                  <PlatformCard key={plataforma} plataforma={plataforma} datos={datos} />
+                ))}
+              </div>
+            </>
+          )}
+        </section>
+      )}
 
-      {gestionAbierta && <CompetidoresEditor />}
+      {(sinCompetidoresReales || gestionAbierta) && <CompetidoresEditor />}
     </>
   );
 };

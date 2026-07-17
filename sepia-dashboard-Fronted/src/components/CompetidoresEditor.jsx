@@ -1,10 +1,18 @@
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { getCompetidoresSocial, createCompetidorSocial, updateCompetidorSocial } from "../api.js";
 
 const PLATAFORMAS = [
   { value: "instagram", label: "Instagram" },
   { value: "facebook", label: "Facebook" },
 ];
+
+const PLATFORM_LABEL = { instagram: "Instagram", facebook: "Facebook" };
+
+const estadoDe = (c) => {
+  if (c.last_error) return { texto: "Sin datos recientes", clase: "warn", detalle: c.last_error };
+  if (c.last_synced_at) return { texto: "Sincronizado", clase: "ok", detalle: null };
+  return { texto: "Pendiente de primer sync", clase: "pending", detalle: null };
+};
 
 export default function CompetidoresEditor() {
   const [competidores, setCompetidores] = useState([]);
@@ -15,6 +23,10 @@ export default function CompetidoresEditor() {
   const [handle, setHandle] = useState("");
   const [nombreVisible, setNombreVisible] = useState("");
   const [guardando, setGuardando] = useState(false);
+
+  const idPlataforma = useId();
+  const idHandle = useId();
+  const idNombre = useId();
 
   const cargarCompetidores = async () => {
     setCargando(true);
@@ -64,31 +76,50 @@ export default function CompetidoresEditor() {
   return (
     <div className="panel">
       <div className="panel-head">
-        <h2>Competidores</h2>
-        <span>Instagram completo · Facebook solo seguidores</span>
+        <h2>Gestionar competidores</h2>
+        <span>Se sincroniza una vez al día — el primer perfil puede tardar hasta la próxima corrida</span>
       </div>
 
-      <form onSubmit={handleAgregar} style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
-        <select value={plataforma} onChange={(e) => setPlataforma(e.target.value)}>
-          {PLATAFORMAS.map((p) => (
-            <option key={p.value} value={p.value}>{p.label}</option>
-          ))}
-        </select>
-        <input
-          type="text"
-          placeholder="@handle"
-          value={handle}
-          onChange={(e) => setHandle(e.target.value)}
-          aria-label="handle"
-        />
-        <input
-          type="text"
-          placeholder="Nombre visible (opcional)"
-          value={nombreVisible}
-          onChange={(e) => setNombreVisible(e.target.value)}
-          aria-label="nombre visible"
-        />
-        <button type="submit" className="btn-xs" disabled={guardando}>
+      <form onSubmit={handleAgregar} className="competidor-form">
+        <div className="field-group">
+          <label htmlFor={idPlataforma}>Plataforma</label>
+          <select
+            id={idPlataforma}
+            className="field-input"
+            value={plataforma}
+            onChange={(e) => setPlataforma(e.target.value)}
+          >
+            {PLATAFORMAS.map((p) => (
+              <option key={p.value} value={p.value}>{p.label}</option>
+            ))}
+          </select>
+        </div>
+
+        <div className="field-group">
+          <label htmlFor={idHandle}>Usuario / handle</label>
+          <input
+            id={idHandle}
+            type="text"
+            className="field-input"
+            placeholder="@handle"
+            value={handle}
+            onChange={(e) => setHandle(e.target.value)}
+          />
+        </div>
+
+        <div className="field-group">
+          <label htmlFor={idNombre}>Nombre visible</label>
+          <input
+            id={idNombre}
+            type="text"
+            className="field-input"
+            placeholder="Opcional"
+            value={nombreVisible}
+            onChange={(e) => setNombreVisible(e.target.value)}
+          />
+        </div>
+
+        <button type="submit" className="btn btn-primary" disabled={guardando}>
           {guardando ? "Agregando..." : "Agregar competidor"}
         </button>
       </form>
@@ -97,43 +128,50 @@ export default function CompetidoresEditor() {
 
       {!cargando && competidores.length === 0 && !error && (
         <div className="empty-state">
-          Todavía no cargaste competidores. Agregá uno arriba para empezar a compararte.
+          Todavía no cargaste competidores. Completá el formulario de arriba con el @usuario de alguien que quieras
+          seguir de cerca — Instagram trae seguidores, cadencia y engagement; Facebook solo seguidores.
         </div>
       )}
 
       {competidores.length > 0 && (
-        <div className="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Plataforma</th>
-                <th>Handle</th>
-                <th>Estado</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {competidores.map((c) => (
-                <tr key={c.id}>
-                  <td>{c.plataforma}</td>
-                  <td>{c.nombre_visible || c.handle}</td>
-                  <td>
-                    {c.last_error
-                      ? <span title={c.last_error}>Sin datos recientes</span>
-                      : c.last_synced_at
-                        ? "Sincronizado"
-                        : "Pendiente de primer sync"}
-                  </td>
-                  <td>
-                    <button type="button" className="btn-xs" onClick={() => handleToggleActivo(c)}>
-                      {c.activo ? "Desactivar" : "Activar"}
-                    </button>
-                  </td>
+        <>
+          <div className="competidores-list-head">
+            <h4>{competidores.length} {competidores.length === 1 ? "competidor cargado" : "competidores cargados"}</h4>
+          </div>
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Plataforma</th>
+                  <th>Handle</th>
+                  <th>Estado</th>
+                  <th></th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {competidores.map((c) => {
+                  const estado = estadoDe(c);
+                  return (
+                    <tr key={c.id}>
+                      <td>{PLATFORM_LABEL[c.plataforma] || c.plataforma}</td>
+                      <td>{c.nombre_visible || c.handle}</td>
+                      <td>
+                        <span className={`status-dot ${estado.clase}`} title={estado.detalle || undefined}>
+                          {estado.texto}
+                        </span>
+                      </td>
+                      <td>
+                        <button type="button" className="btn-xs" onClick={() => handleToggleActivo(c)}>
+                          {c.activo ? "Desactivar" : "Activar"}
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </>
       )}
     </div>
   );

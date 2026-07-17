@@ -33,8 +33,8 @@ describe("CompetidoresEditor", () => {
     render(<CompetidoresEditor />);
     await waitFor(() => expect(screen.getByText(/todavía no cargaste/i)).toBeInTheDocument());
 
-    fireEvent.change(screen.getByLabelText("handle"), { target: { value: "nuevo" } });
-    fireEvent.click(screen.getByText("Agregar competidor"));
+    fireEvent.change(screen.getByLabelText(/handle/i), { target: { value: "nuevo" } });
+    fireEvent.click(screen.getByRole("button", { name: "Agregar competidor" }));
 
     await waitFor(() => expect(screen.getByText("Nuevo")).toBeInTheDocument());
     expect(api.createCompetidorSocial).toHaveBeenCalledWith(
@@ -49,12 +49,12 @@ describe("CompetidoresEditor", () => {
     render(<CompetidoresEditor />);
     await waitFor(() => expect(screen.getByText(/todavía no cargaste/i)).toBeInTheDocument());
 
-    fireEvent.change(screen.getByLabelText("handle"), { target: { value: "repetido" } });
-    fireEvent.click(screen.getByText("Agregar competidor"));
+    fireEvent.change(screen.getByLabelText(/handle/i), { target: { value: "repetido" } });
+    fireEvent.click(screen.getByRole("button", { name: "Agregar competidor" }));
 
     await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("Ya existe ese competidor"));
     // El handle tipeado sigue en el input, no se perdió
-    expect(screen.getByLabelText("handle")).toHaveValue("repetido");
+    expect(screen.getByLabelText(/handle/i)).toHaveValue("repetido");
   });
 
   it("muestra 'sin datos recientes' cuando el competidor tiene last_error", async () => {
