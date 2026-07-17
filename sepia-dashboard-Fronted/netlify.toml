@@ -2,59 +2,67 @@
   command = "npm run build"
   publish = "dist"
 
-# Backend como Netlify Function (reemplaza a Render). El codigo real vive en
-# "../sepia meli api"; netlify/functions/api.mjs solo lo re-exporta.
-[functions]
-  directory = "netlify/functions"
-  node_bundler = "esbuild"
-
-# Rutas del backend -> funcion "api". Deben ir ANTES del fallback del SPA.
-# Nota: NO usar public/_redirects — ese archivo tiene prioridad sobre este
-# y su catch-all /* se tragaria las rutas del backend.
-[[redirects]]
-  from = "/db/*"
-  to = "/.netlify/functions/api/db/:splat"
-  status = 200
-
-[[redirects]]
-  from = "/meli/*"
-  to = "/.netlify/functions/api/meli/:splat"
-  status = 200
-
-[[redirects]]
-  from = "/auth/*"
-  to = "/.netlify/functions/api/auth/:splat"
-  status = 200
-
-[[redirects]]
-  from = "/ads/*"
-  to = "/.netlify/functions/api/ads/:splat"
-  status = 200
-
-[[redirects]]
-  from = "/api/*"
-  to = "/.netlify/functions/api/api/:splat"
-  status = 200
-
-[[redirects]]
-  from = "/admin/*"
-  to = "/.netlify/functions/api/admin/:splat"
-  status = 200
-
-[[redirects]]
-  from = "/cron/*"
-  to = "/.netlify/functions/api/cron/:splat"
-  status = 200
-
-[[redirects]]
-  from = "/notifications"
-  to = "/.netlify/functions/api/notifications"
-  status = 200
-
-[[redirects]]
-  from = "/mcp-callback"
-  to = "/.netlify/functions/api/mcp-callback"
-  status = 200
+# --- Migracion a Netlify Functions: PAUSADA (2026-07-18) ---
+# El bloque [functions] de abajo intenta empaquetar el codigo de
+# "../sepia meli api" (netlifyHandler.js -> app.js), pero esa carpeta tiene
+# su PROPIO package.json/node_modules que el build de Netlify no instala
+# (solo instala los de sepia-dashboard-Fronted) -> el build automatico en
+# cada push falla ("Build script returned non-zero exit code: 2").
+# Mientras tanto el sitio sigue andando: VITE_API_URL (.env.production)
+# apunta directo a Render, asi que esta funcion no se usa para nada todavia.
+# Para retomar la migracion: agregar un paso de build que tambien corra
+# "npm install" dentro de "sepia meli api/" (o mover sus dependencias al
+# package.json del frontend), resolver sesiones sin estado y mover el cron
+# a GitHub Actions — ver docs/migracion-netlify.md — y descomentar todo esto.
+#
+# [functions]
+#   directory = "netlify/functions"
+#   node_bundler = "esbuild"
+#
+# [[redirects]]
+#   from = "/db/*"
+#   to = "/.netlify/functions/api/db/:splat"
+#   status = 200
+#
+# [[redirects]]
+#   from = "/meli/*"
+#   to = "/.netlify/functions/api/meli/:splat"
+#   status = 200
+#
+# [[redirects]]
+#   from = "/auth/*"
+#   to = "/.netlify/functions/api/auth/:splat"
+#   status = 200
+#
+# [[redirects]]
+#   from = "/ads/*"
+#   to = "/.netlify/functions/api/ads/:splat"
+#   status = 200
+#
+# [[redirects]]
+#   from = "/api/*"
+#   to = "/.netlify/functions/api/api/:splat"
+#   status = 200
+#
+# [[redirects]]
+#   from = "/admin/*"
+#   to = "/.netlify/functions/api/admin/:splat"
+#   status = 200
+#
+# [[redirects]]
+#   from = "/cron/*"
+#   to = "/.netlify/functions/api/cron/:splat"
+#   status = 200
+#
+# [[redirects]]
+#   from = "/notifications"
+#   to = "/.netlify/functions/api/notifications"
+#   status = 200
+#
+# [[redirects]]
+#   from = "/mcp-callback"
+#   to = "/.netlify/functions/api/mcp-callback"
+#   status = 200
 
 # Fallback del SPA (rutas internas de React)
 [[redirects]]
