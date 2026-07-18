@@ -12,6 +12,7 @@ import KPI from "../components/KPI";
 import MetaDateRangePicker from "../components/MetaDateRangePicker";
 import HeatmapTable from "../components/HeatmapTable";
 import CompetidoresEditor from "../components/CompetidoresEditor";
+import Avatar from "../components/Avatar";
 import { getMetaRedes, getSocialPosts, getSocialBenchmark } from "../api";
 import { calcDelta, fCurrency, fNumber, fmtYmd, daysAgo, prettyDate } from "../utils";
 
@@ -82,8 +83,6 @@ const avatarColorFor = (key) => {
   return AVATAR_PALETTE[Math.abs(hash) % AVATAR_PALETTE.length];
 };
 
-const initialOf = (name) => (name || "?").trim().charAt(0).toUpperCase() || "?";
-
 const fPercent = (v) => (v != null ? `${(v * 100).toFixed(1)}%` : null);
 
 // La base de datos guarda un competidor+plataforma por fila (decisión del
@@ -97,8 +96,12 @@ const buildProfiles = (competidores) => {
     const nombre = (c.nombre_visible || c.handle || "").trim();
     const key = nombre.toLowerCase();
     if (!key) return;
-    if (!map.has(key)) map.set(key, { id: key, nombre, plataformas: {} });
-    map.get(key).plataformas[c.plataforma] = c;
+    if (!map.has(key)) map.set(key, { id: key, nombre, fotoUrl: null, plataformas: {} });
+    const perfil = map.get(key);
+    perfil.plataformas[c.plataforma] = c;
+    // Si hay foto de más de una plataforma para el mismo perfil, se prioriza
+    // Instagram (perfil más completo) — no importa el orden en que llegaron.
+    if (c.foto_url && (!perfil.fotoUrl || c.plataforma === "instagram")) perfil.fotoUrl = c.foto_url;
   });
   return [...map.values()];
 };
@@ -126,7 +129,13 @@ const buildTuMarcaProfile = (ig, fb) => {
       cadencia_semanal: null,
     };
   }
-  return { id: "__tu_marca__", nombre: ig?.username ? `@${ig.username}` : "Sepia", esTuMarca: true, plataformas };
+  return {
+    id: "__tu_marca__",
+    nombre: ig?.username ? `@${ig.username}` : "Sepia",
+    fotoUrl: ig?.foto || null,
+    esTuMarca: true,
+    plataformas,
+  };
 };
 
 const PLATFORM_LABEL = { instagram: "Instagram", facebook: "Facebook" };
@@ -221,12 +230,12 @@ const CompetidoresTab = ({ ig, fb }) => {
                 className={`profile-chip ${activo?.id === p.id ? "active" : ""}`}
                 onClick={() => setSeleccionado(p.id)}
               >
-                <span
-                  className="avatar-circle sm"
-                  style={{ background: p.esTuMarca ? "var(--accent)" : avatarColorFor(p.id) }}
-                >
-                  {initialOf(p.nombre)}
-                </span>
+                <Avatar
+                  fotoUrl={p.fotoUrl}
+                  nombre={p.nombre}
+                  color={p.esTuMarca ? "var(--accent)" : avatarColorFor(p.id)}
+                  size="sm"
+                />
                 {p.nombre}
               </button>
             ))}
@@ -236,12 +245,12 @@ const CompetidoresTab = ({ ig, fb }) => {
             <>
               <div className="profile-card-header">
                 <div className="profile-identity">
-                  <span
-                    className="avatar-circle lg"
-                    style={{ background: activo.esTuMarca ? "var(--accent)" : avatarColorFor(activo.id) }}
-                  >
-                    {initialOf(activo.nombre)}
-                  </span>
+                  <Avatar
+                    fotoUrl={activo.fotoUrl}
+                    nombre={activo.nombre}
+                    color={activo.esTuMarca ? "var(--accent)" : avatarColorFor(activo.id)}
+                    size="lg"
+                  />
                   <div>
                     <h3>
                       {activo.nombre}

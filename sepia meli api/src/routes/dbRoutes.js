@@ -155,7 +155,7 @@ export const createDbRouter = ({
       // Último snapshot por competidor (no todo el histórico).
       const [rows] = await dbPool.query(
         `SELECT DISTINCT ON (c.id)
-                c.id AS competidor_id, c.plataforma, c.handle, c.nombre_visible,
+                c.id AS competidor_id, c.plataforma, c.handle, c.nombre_visible, c.foto_url,
                 c.last_error, c.last_synced_at,
                 b.seguidores, b.posts_count, b.engagement_aprox, b.cadencia_semanal, b.fecha_snapshot
          FROM competidores_social c

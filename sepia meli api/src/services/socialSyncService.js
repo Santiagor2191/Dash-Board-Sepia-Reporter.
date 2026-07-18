@@ -85,8 +85,8 @@ export const createSocialSyncService = ({ metaSocialService, dbPool }) => {
           ],
         );
         await dbPool.query(
-          `UPDATE competidores_social SET last_error = NULL, last_synced_at = now() WHERE id = $1`,
-          [competidor.id],
+          `UPDATE competidores_social SET last_error = NULL, last_synced_at = now(), foto_url = $2 WHERE id = $1`,
+          [competidor.id, benchmark.foto_url ?? null],
         );
         ok += 1;
       } catch (error) {
