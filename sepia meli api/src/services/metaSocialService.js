@@ -335,44 +335,48 @@ export const createMetaSocialService = ({ accessToken, adAccountId }) => {
   const fetchCompetitorBenchmark = async ({ plataforma, handle }) => {
     if (!accessToken) throw new Error("Falta META_ACCESS_TOKEN en el .env del backend.");
 
-    if (plataforma === "instagram") {
-      const { ig } = await resolvePageAndIg();
-      if (!ig) throw new Error("No hay cuenta de Instagram vinculada para consultar Business Discovery.");
-      const data = await graphGet(`${ig.id}`, {
-        fields: `business_discovery.username(${handle}){followers_count,media_count,profile_picture_url,media.limit(12){like_count,comments_count,timestamp}}`,
-      });
-      const bd = data?.business_discovery;
-      if (!bd) throw new Error(`No se encontró la cuenta @${handle} (¿no es una cuenta Business/Creator?).`);
-      const posts = bd.media?.data || [];
-      const totalLikesComments = posts.reduce(
-        (acc, p) => acc + (Number(p.like_count) || 0) + (Number(p.comments_count) || 0),
-        0,
-      );
-      const seguidores = Number(bd.followers_count) || 0;
-      const engagementAprox = seguidores > 0 && posts.length ? totalLikesComments / posts.length / seguidores : null;
-      const cadenciaSemanal = computeCadenciaSemanal(posts.map((p) => p.timestamp));
-      return {
-        seguidores,
-        posts_count: Number(bd.media_count) || 0,
-        engagement_aprox: engagementAprox,
-        cadencia_semanal: cadenciaSemanal,
-        foto_url: bd.profile_picture_url || null,
-      };
-    }
+    try {
+      if (plataforma === "instagram") {
+        const { ig } = await resolvePageAndIg();
+        if (!ig) throw new Error("No hay cuenta de Instagram vinculada para consultar Business Discovery.");
+        const data = await graphGet(`${ig.id}`, {
+          fields: `business_discovery.username(${handle}){followers_count,media_count,profile_picture_url,media.limit(12){like_count,comments_count,timestamp}}`,
+        });
+        const bd = data?.business_discovery;
+        if (!bd) throw new Error(`No se encontró la cuenta @${handle} (¿no es una cuenta Business/Creator?).`);
+        const posts = bd.media?.data || [];
+        const totalLikesComments = posts.reduce(
+          (acc, p) => acc + (Number(p.like_count) || 0) + (Number(p.comments_count) || 0),
+          0,
+        );
+        const seguidores = Number(bd.followers_count) || 0;
+        const engagementAprox = seguidores > 0 && posts.length ? totalLikesComments / posts.length / seguidores : null;
+        const cadenciaSemanal = computeCadenciaSemanal(posts.map((p) => p.timestamp));
+        return {
+          seguidores,
+          posts_count: Number(bd.media_count) || 0,
+          engagement_aprox: engagementAprox,
+          cadencia_semanal: cadenciaSemanal,
+          foto_url: bd.profile_picture_url || null,
+        };
+      }
 
-    if (plataforma === "facebook") {
-      // Dato público, no requiere permisos especiales sobre la página ajena.
-      const data = await graphGet(handle, { fields: "followers_count,fan_count,picture.type(large)" });
-      return {
-        seguidores: Number(data.followers_count || data.fan_count) || 0,
-        posts_count: null,
-        engagement_aprox: null,
-        cadencia_semanal: null,
-        foto_url: data.picture?.data?.url || null,
-      };
-    }
+      if (plataforma === "facebook") {
+        // Dato público, no requiere permisos especiales sobre la página ajena.
+        const data = await graphGet(handle, { fields: "followers_count,fan_count,picture.type(large)" });
+        return {
+          seguidores: Number(data.followers_count || data.fan_count) || 0,
+          posts_count: null,
+          engagement_aprox: null,
+          cadencia_semanal: null,
+          foto_url: data.picture?.data?.url || null,
+        };
+      }
 
-    throw new Error(`Plataforma desconocida: ${plataforma}`);
+      throw new Error(`Plataforma desconocida: ${plataforma}`);
+    } catch (error) {
+      throw new Error(friendlyGraphError(error));
+    }
   };
 
   return { getSocial, fetchPostsForSync, fetchCompetitorBenchmark };
