@@ -379,7 +379,22 @@ export const createMetaSocialService = ({ accessToken, adAccountId }) => {
     }
   };
 
-  return { getSocial, fetchPostsForSync, fetchCompetitorBenchmark };
+  // Seguidores propios (IG + FB) para el snapshot diario de "Tu marca" — un
+  // solo llamado liviano a me/accounts, sin insights ni rango de fechas.
+  const fetchOwnFollowers = async () => {
+    if (!accessToken) throw new Error("Falta META_ACCESS_TOKEN en el .env del backend.");
+    try {
+      const { page, ig } = await resolvePageAndIg();
+      return {
+        instagram: ig ? Number(ig.followers_count) || 0 : null,
+        facebook: page ? Number(page.followers_count || page.fan_count) || 0 : null,
+      };
+    } catch (error) {
+      throw new Error(friendlyGraphError(error));
+    }
+  };
+
+  return { getSocial, fetchPostsForSync, fetchCompetitorBenchmark, fetchOwnFollowers };
 };
 
 // Posts por semana en las últimas ~4 semanas de la muestra traída (no es un

@@ -80,9 +80,14 @@ const makeFakeDbPool = () => {
     { seguidores: 900, fecha_snapshot: "2026-07-16" },
     { seguidores: 950, fecha_snapshot: "2026-07-17" },
   ];
+  const marcaHistorial = [
+    { plataforma: "instagram", seguidores: 590, fecha_snapshot: "2026-07-16" },
+    { plataforma: "instagram", seguidores: 594, fecha_snapshot: "2026-07-17" },
+  ];
 
   return {
     query: async (sql, params = []) => {
+      if (sql.includes("FROM marca_historial")) return [marcaHistorial];
       if (sql.includes("FROM social_benchmark")) {
         return params[0] === 1 ? [historial] : [[]];
       }
@@ -155,6 +160,17 @@ test("GET /db/social-benchmark-historial/:id devuelve la serie de seguidores", a
 
   const malo = await requestJson(server.baseUrl, "/db/social-benchmark-historial/abc");
   assert.equal(malo.response.status, 400);
+});
+
+test("GET /db/marca-historial devuelve el snapshot propio", async (t) => {
+  const router = createDbRouter({ dbPool: makeFakeDbPool() });
+  const server = await startServer({ mountPath: "/db", router });
+  t.after(async () => server.close());
+
+  const { response, data } = await requestJson(server.baseUrl, "/db/marca-historial");
+  assert.equal(response.status, 200);
+  assert.equal(data.historial.length, 2);
+  assert.equal(data.historial[1].seguidores, 594);
 });
 
 test("POST /db/competidores-social normaliza el handle y valida plataforma", async (t) => {

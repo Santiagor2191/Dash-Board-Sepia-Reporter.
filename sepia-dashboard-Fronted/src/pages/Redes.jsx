@@ -13,7 +13,7 @@ import MetaDateRangePicker from "../components/MetaDateRangePicker";
 import HeatmapTable from "../components/HeatmapTable";
 import CompetidoresEditor from "../components/CompetidoresEditor";
 import Avatar from "../components/Avatar";
-import { getMetaRedes, getSocialPosts, getSocialBenchmark, getSocialBenchmarkHistorial } from "../api";
+import { getMetaRedes, getSocialPosts, getSocialBenchmark, getSocialBenchmarkHistorial, getMarcaHistorial } from "../api";
 import { calcDelta, fCurrency, fNumber, fmtYmd, daysAgo, prettyDate } from "../utils";
 
 const TABS = [
@@ -107,7 +107,7 @@ const buildProfiles = (competidores) => {
     if (!key) return;
     if (!map.has(key)) map.set(key, { id: key, nombre, fotoUrl: null, plataformas: {} });
     const perfil = map.get(key);
-    perfil.plataformas[c.plataforma] = c;
+    perfil.plataformas[c.plataforma] = { ...c, historialKey: `comp:${c.competidor_id}` };
     // Si hay foto de más de una plataforma para el mismo perfil, se prioriza
     // Instagram (perfil más completo) — no importa el orden en que llegaron.
     if (c.foto_url && (!perfil.fotoUrl || c.plataforma === "instagram")) perfil.fotoUrl = c.foto_url;
@@ -128,6 +128,7 @@ const buildTuMarcaProfile = (ig, fb) => {
       engagement_aprox: ig.alcance > 0 ? ig.interacciones / ig.alcance : null,
       posts_count: ig.publicaciones_total,
       cadencia_semanal: cadenciaSemanalDePosts(ig.posts),
+      historialKey: "own:instagram",
     };
   }
   if (fb) {
@@ -136,6 +137,7 @@ const buildTuMarcaProfile = (ig, fb) => {
       engagement_aprox: null,
       posts_count: null,
       cadencia_semanal: null,
+      historialKey: "own:facebook",
     };
   }
   return {
@@ -155,8 +157,8 @@ const PLATFORM_TAG = { instagram: "IG", facebook: "FB" };
 // con los días. Con menos de 2 puntos no hay curva que dibujar todavía.
 // El historial se trae una sola vez arriba en CompetidoresTab (para todos
 // los competidores a la vez) y se pasa acá como prop, no se refetchea.
-const SeguidoresHistorial = ({ competidorId, historial }) => {
-  if (!competidorId || !historial || historial.length < 2) return null;
+const SeguidoresHistorial = ({ historialKey, historial }) => {
+  if (!historialKey || !historial || historial.length < 2) return null;
 
   const serie = historial.map((h) => ({ ...h, dia: String(h.fecha_snapshot).slice(5, 10) }));
 
@@ -166,7 +168,7 @@ const SeguidoresHistorial = ({ competidorId, historial }) => {
       <ResponsiveContainer width="100%" height="100%">
         <AreaChart data={serie} margin={{ top: 4, right: 4, left: 4, bottom: 0 }}>
           <defs>
-            <linearGradient id={`segFill-${competidorId}`} x1="0" y1="0" x2="0" y2="1">
+            <linearGradient id={`segFill-${historialKey}`} x1="0" y1="0" x2="0" y2="1">
               <stop offset="0%" stopColor="#c9793f" stopOpacity={0.3} />
               <stop offset="100%" stopColor="#c9793f" stopOpacity={0.02} />
             </linearGradient>
@@ -179,7 +181,7 @@ const SeguidoresHistorial = ({ competidorId, historial }) => {
             dataKey="seguidores"
             stroke="#c9793f"
             strokeWidth={2}
-            fill={`url(#segFill-${competidorId})`}
+            fill={`url(#segFill-${historialKey})`}
             dot={false}
           />
         </AreaChart>
@@ -213,7 +215,7 @@ const PlatformCard = ({ plataforma, datos, historial }) => {
           </div>
         ))}
       </div>
-      <SeguidoresHistorial competidorId={datos.competidor_id} historial={historial} />
+      <SeguidoresHistorial historialKey={datos.historialKey} historial={historial} />
       {plataforma === "facebook" && faltanDatos && (
         <p className="platform-card-note">
           Meta solo entrega seguidores de páginas ajenas sin un trámite de revisión aparte — el resto de las métricas no está disponible.
@@ -244,7 +246,7 @@ const ComparisonTable = ({ perfiles, historiales }) => {
       perfil: p,
       plataforma,
       datos,
-      cambio: cambioDeSeguidores(historiales[datos.competidor_id]),
+      cambio: cambioDeSeguidores(historiales[datos.historialKey]),
     })),
   );
   filas.sort((a, b) => (b.datos.seguidores || 0) - (a.datos.seguidores || 0));
@@ -307,19 +309,44 @@ const CompetidoresTab = ({ ig, fb }) => {
 
   // Un solo fetch de historial por competidor, apenas se conoce la lista —
   // lo usan tanto el mini-gráfico de la tarjeta como la tabla comparativa,
-  // así que se trae una vez arriba en vez de repetirlo en cada uno.
+  // así que se trae una vez arriba en vez de repetirlo en cada uno. Se
+  // mergea con lo que ya haya en el mapa (no lo pisa) porque el historial
+  // propio se carga en un efecto aparte, en paralelo.
   useEffect(() => {
     if (!competidores || competidores.length === 0) return;
     let cancelled = false;
     Promise.all(
       competidores.map((c) =>
         getSocialBenchmarkHistorial(c.competidor_id)
-          .then((payload) => [c.competidor_id, payload.historial || []])
-          .catch(() => [c.competidor_id, []]),
+          .then((payload) => [`comp:${c.competidor_id}`, payload.historial || []])
+          .catch(() => [`comp:${c.competidor_id}`, []]),
       ),
-    ).then((pares) => { if (!cancelled) setHistoriales(Object.fromEntries(pares)); });
+    ).then((pares) => {
+      if (!cancelled) setHistoriales((prev) => ({ ...prev, ...Object.fromEntries(pares) }));
+    });
     return () => { cancelled = true; };
   }, [competidores]);
+
+  // Historial de seguidores de la propia cuenta — se trae una sola vez, no
+  // depende de la lista de competidores.
+  useEffect(() => {
+    let cancelled = false;
+    getMarcaHistorial()
+      .then((payload) => {
+        if (cancelled) return;
+        const porPlataforma = { instagram: [], facebook: [] };
+        (payload.historial || []).forEach((h) => {
+          if (porPlataforma[h.plataforma]) porPlataforma[h.plataforma].push(h);
+        });
+        setHistoriales((prev) => ({
+          ...prev,
+          "own:instagram": porPlataforma.instagram,
+          "own:facebook": porPlataforma.facebook,
+        }));
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
 
   const tuMarca = useMemo(() => buildTuMarcaProfile(ig, fb), [ig, fb]);
   // Competidores ordenados de mayor a menor engagement — el que no tiene
@@ -424,7 +451,7 @@ const CompetidoresTab = ({ ig, fb }) => {
                         key={plataforma}
                         plataforma={plataforma}
                         datos={datos}
-                        historial={historiales[datos.competidor_id]}
+                        historial={historiales[datos.historialKey]}
                       />
                     ))}
                   </div>

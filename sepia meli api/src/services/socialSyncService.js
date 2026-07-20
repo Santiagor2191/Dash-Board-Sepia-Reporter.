@@ -101,10 +101,29 @@ export const createSocialSyncService = ({ metaSocialService, dbPool }) => {
     return { ok, con_error: conError, total: competidores.length };
   };
 
+  // Snapshot diario de los seguidores propios — aislado igual que los
+  // competidores (3A): si falla, no debe tumbar el resto del sync.
+  const syncMarca = async () => {
+    try {
+      const seguidores = await metaSocialService.fetchOwnFollowers();
+      const plataformas = Object.entries(seguidores).filter(([, v]) => v != null);
+      for (const [plataforma, valor] of plataformas) {
+        await dbPool.query(
+          `INSERT INTO marca_historial (plataforma, seguidores) VALUES ($1,$2)`,
+          [plataforma, valor],
+        );
+      }
+      return { ok: true, plataformas_guardadas: plataformas.length };
+    } catch (error) {
+      return { ok: false, motivo: error.message || "Error desconocido guardando el snapshot propio." };
+    }
+  };
+
   const correrSync = async () => {
     const posts = await syncPosts();
     const competidores = await syncCompetidores();
-    return { posts, competidores };
+    const marca = await syncMarca();
+    return { posts, competidores, marca };
   };
 
   return { correrSync };

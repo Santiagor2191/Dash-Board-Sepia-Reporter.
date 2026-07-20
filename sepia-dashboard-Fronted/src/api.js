@@ -119,6 +119,7 @@ export const getSocialPosts = (limit = 50) => request(`/db/social-posts?limit=${
 export const getSocialBenchmark = () => request("/db/social-benchmark");
 export const getSocialBenchmarkHistorial = (competidorId) =>
   request(`/db/social-benchmark-historial/${competidorId}`);
+export const getMarcaHistorial = () => request("/db/marca-historial");
 export const getCompetidoresSocial = () => request("/db/competidores-social");
 export const createCompetidorSocial = (competidor) =>
   request("/db/competidores-social", { method: "POST", body: JSON.stringify(competidor) });

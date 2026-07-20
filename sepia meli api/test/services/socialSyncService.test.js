@@ -87,6 +87,39 @@ test("syncCompetidores: un competidor con error no bloquea a los demás", async 
   assert.equal(benchmarkInserts.length, 2); // solo los 2 que funcionaron
 });
 
+test("syncMarca: guarda un snapshot por plataforma con datos", async () => {
+  const dbPool = makeFakeDbPool();
+  const metaSocialService = {
+    fetchPostsForSync: async () => ({ configured: true, posts: [] }),
+    fetchCompetitorBenchmark: async () => { throw new Error("no debería llamarse"); },
+    fetchOwnFollowers: async () => ({ instagram: 500, facebook: 200 }),
+  };
+
+  const service = createSocialSyncService({ metaSocialService, dbPool });
+  const resultado = await service.correrSync();
+
+  assert.equal(resultado.marca.ok, true);
+  assert.equal(resultado.marca.plataformas_guardadas, 2);
+  const inserts = dbPool.calls.filter((c) => c.sql.includes("INSERT INTO marca_historial"));
+  assert.equal(inserts.length, 2);
+});
+
+test("syncMarca: un fallo de Meta no bloquea posts ni competidores", async () => {
+  const dbPool = makeFakeDbPool();
+  const metaSocialService = {
+    fetchPostsForSync: async () => ({ configured: true, posts: [] }),
+    fetchCompetitorBenchmark: async () => { throw new Error("no debería llamarse"); },
+    fetchOwnFollowers: async () => { throw new Error("token vencido"); },
+  };
+
+  const service = createSocialSyncService({ metaSocialService, dbPool });
+  const resultado = await service.correrSync();
+
+  assert.equal(resultado.marca.ok, false);
+  assert.equal(resultado.marca.motivo, "token vencido");
+  assert.equal(resultado.posts.ok, true); // el resto del sync sigue funcionando normal
+});
+
 test("syncCompetidores: sin competidores activos, no falla", async () => {
   const dbPool = makeFakeDbPool({ competidores: [] });
   const metaSocialService = {

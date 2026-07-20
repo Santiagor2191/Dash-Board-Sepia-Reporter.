@@ -201,6 +201,27 @@ export const createDbRouter = ({
     }
   });
 
+  // Historial de seguidores de la propia cuenta (Instagram + Facebook), para
+  // que "Tu marca" tenga la misma columna "Cambio" que los competidores.
+  router.get("/marca-historial", async (req, res) => {
+    try {
+      const [rows] = await dbPool.query(
+        `SELECT plataforma, seguidores, fecha_snapshot FROM marca_historial
+         WHERE seguidores IS NOT NULL
+         ORDER BY fecha_snapshot ASC
+         LIMIT 360`,
+      );
+      return res.json({ ok: true, historial: rows });
+    } catch (error) {
+      return sendInternalError(
+        res,
+        "Error consultando marca_historial",
+        "No se pudo traer el historial de seguidores propios",
+        error,
+      );
+    }
+  });
+
   router.get("/competidores-social", async (req, res) => {
     try {
       const [rows] = await dbPool.query(
