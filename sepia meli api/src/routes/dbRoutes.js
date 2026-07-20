@@ -283,6 +283,14 @@ export const createDbRouter = ({
         campos.push(`nombre_visible = $${campos.length + 1}`);
         valores.push(String(req.body.nombre_visible || "").trim() || null);
       }
+      if (req.body?.handle !== undefined) {
+        const handle = normalizarHandle(req.body.handle);
+        if (!handle) {
+          return res.status(400).json({ ok: false, mensaje: "handle no puede quedar vacío" });
+        }
+        campos.push(`handle = $${campos.length + 1}`);
+        valores.push(handle);
+      }
       if (req.body?.activo !== undefined) {
         campos.push(`activo = $${campos.length + 1}`);
         valores.push(Boolean(req.body.activo));
@@ -302,6 +310,10 @@ export const createDbRouter = ({
       }
       return res.json({ ok: true, competidor: rows[0] });
     } catch (error) {
+      // Choque con el UNIQUE (plataforma, handle) — ya existe otra fila con ese handle.
+      if (error?.code === "23505") {
+        return res.status(409).json({ ok: false, mensaje: "Ya existe un competidor con ese handle en esa plataforma" });
+      }
       return sendInternalError(
         res,
         "Error editando competidor",

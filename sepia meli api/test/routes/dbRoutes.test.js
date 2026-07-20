@@ -111,12 +111,19 @@ const makeFakeDbPool = () => {
         const comp = competidores.find((c) => c.id === id);
         if (!comp) return [[]];
         // Solo mirar la cláusula SET, no el RETURNING (que siempre menciona
-        // ambas columnas independientemente de cuáles se estén actualizando).
+        // todas las columnas independientemente de cuáles se estén actualizando).
         const setClause = sql.split("WHERE")[0];
         const setsNombre = setClause.includes("nombre_visible");
+        const setsHandle = setClause.includes("handle");
         const setsActivo = setClause.includes("activo");
         let idx = 0;
         if (setsNombre) comp.nombre_visible = params[idx++];
+        if (setsHandle) {
+          const nuevoHandle = params[idx++];
+          const choque = competidores.find((c) => c.id !== id && c.plataforma === comp.plataforma && c.handle === nuevoHandle);
+          if (choque) { const err = new Error("duplicate key"); err.code = "23505"; throw err; }
+          comp.handle = nuevoHandle;
+        }
         if (setsActivo) comp.activo = params[idx++];
         return [[comp]];
       }
@@ -190,6 +197,29 @@ test("POST /db/competidores-social normaliza el handle y valida plataforma", asy
   });
   assert.equal(bueno.response.status, 201);
   assert.equal(bueno.data.competidor.handle, "compedor_nuevo"); // sin @, minusculas, sin espacios
+});
+
+test("PUT /db/competidores-social/:id permite editar el handle y detecta choques", async (t) => {
+  const router = createDbRouter({ dbPool: makeFakeDbPool() });
+  const server = await startServer({ mountPath: "/db", router });
+  t.after(async () => server.close());
+
+  const editado = await requestJson(server.baseUrl, "/db/competidores-social/1", {
+    method: "PUT",
+    body: { handle: "@Nuevo_Handle " },
+  });
+  assert.equal(editado.response.status, 200);
+  assert.equal(editado.data.competidor.handle, "nuevo_handle"); // normalizado igual que en POST
+
+  await requestJson(server.baseUrl, "/db/competidores-social", {
+    method: "POST",
+    body: { plataforma: "instagram", handle: "otro" },
+  });
+  const choque = await requestJson(server.baseUrl, "/db/competidores-social/1", {
+    method: "PUT",
+    body: { handle: "otro" },
+  });
+  assert.equal(choque.response.status, 409);
 });
 
 test("PUT /db/competidores-social/:id desactiva sin borrar histórico", async (t) => {

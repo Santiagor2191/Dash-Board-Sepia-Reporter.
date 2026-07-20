@@ -19,8 +19,9 @@ export default function CompetidoresEditor() {
   const [handleFacebook, setHandleFacebook] = useState("");
   const [guardando, setGuardando] = useState(false);
 
-  const [renombrandoId, setRenombrandoId] = useState(null);
+  const [editandoId, setEditandoId] = useState(null);
   const [nombreEditado, setNombreEditado] = useState("");
+  const [handleEditado, setHandleEditado] = useState("");
 
   const idNombre = useId();
   const idHandleIg = useId();
@@ -82,30 +83,35 @@ export default function CompetidoresEditor() {
     }
   };
 
-  // Renombrar es la forma de "unir" 2 filas que ya existen (una de Instagram,
-  // otra de Facebook) en una sola tarjeta agrupada — el agrupamiento en la
-  // pestaña Competidores es por nombre_visible exacto, así que si quedaron
-  // con nombres distintos, esto es lo que lo arregla sin recrear nada.
-  const iniciarRenombrar = (competidor) => {
-    setRenombrandoId(competidor.id);
-    setNombreEditado(competidor.nombre_visible || competidor.handle);
+  // Editar nombre y/o handle sin recrear la fila. El nombre visible es solo
+  // la etiqueta que agrupa Instagram+Facebook en una tarjeta (tiene que ser
+  // igual en las dos filas); el handle es el dato real que se usa para
+  // consultar la API de Meta (el usuario o ID de la Página/cuenta) — son 2
+  // cosas distintas y por eso quedaron mezcladas en la misma columna antes.
+  const iniciarEdicion = (competidor) => {
+    setEditandoId(competidor.id);
+    setNombreEditado(competidor.nombre_visible || "");
+    setHandleEditado(competidor.handle);
   };
 
-  const cancelarRenombrar = () => {
-    setRenombrandoId(null);
+  const cancelarEdicion = () => {
+    setEditandoId(null);
     setNombreEditado("");
+    setHandleEditado("");
   };
 
-  const guardarRenombrar = async (competidor) => {
-    const nombre = nombreEditado.trim();
-    if (!nombre) return;
+  const guardarEdicion = async (competidor) => {
+    const handle = handleEditado.trim();
+    if (!handle) return;
     try {
-      await updateCompetidorSocial(competidor.id, { nombre_visible: nombre });
-      setRenombrandoId(null);
-      setNombreEditado("");
+      await updateCompetidorSocial(competidor.id, {
+        nombre_visible: nombreEditado.trim(),
+        handle,
+      });
+      cancelarEdicion();
       await cargarCompetidores();
     } catch (err) {
-      setError(err?.message || "No se pudo renombrar el competidor.");
+      setError(err?.message || "No se pudo editar el competidor.");
     }
   };
 
@@ -182,7 +188,8 @@ export default function CompetidoresEditor() {
               <thead>
                 <tr>
                   <th>Plataforma</th>
-                  <th>Handle</th>
+                  <th>Nombre visible</th>
+                  <th>Handle real (usado para consultar Meta)</th>
                   <th>Estado</th>
                   <th></th>
                 </tr>
@@ -190,13 +197,13 @@ export default function CompetidoresEditor() {
               <tbody>
                 {competidores.map((c) => {
                   const estado = estadoDe(c);
-                  const renombrando = renombrandoId === c.id;
+                  const editando = editandoId === c.id;
                   return (
                     <tr key={c.id}>
                       <td>{PLATFORM_LABEL[c.plataforma] || c.plataforma}</td>
-                      <td>
-                        {renombrando ? (
-                          <div style={{ display: "flex", gap: 6 }}>
+                      {editando ? (
+                        <>
+                          <td>
                             <input
                               type="text"
                               className="field-input"
@@ -205,27 +212,42 @@ export default function CompetidoresEditor() {
                               onChange={(e) => setNombreEditado(e.target.value)}
                               autoFocus
                             />
-                            <button type="button" className="btn-xs" onClick={() => guardarRenombrar(c)}>Guardar</button>
-                            <button type="button" className="btn-xs" onClick={cancelarRenombrar}>Cancelar</button>
-                          </div>
-                        ) : (
-                          c.nombre_visible || c.handle
-                        )}
-                      </td>
+                          </td>
+                          <td>
+                            <input
+                              type="text"
+                              className="field-input"
+                              style={{ minWidth: 140 }}
+                              value={handleEditado}
+                              onChange={(e) => setHandleEditado(e.target.value)}
+                            />
+                          </td>
+                        </>
+                      ) : (
+                        <>
+                          <td>{c.nombre_visible || "—"}</td>
+                          <td>{c.handle}</td>
+                        </>
+                      )}
                       <td>
                         <span className={`status-dot ${estado.clase}`} title={estado.detalle || undefined}>
                           {estado.texto}
                         </span>
                       </td>
                       <td style={{ display: "flex", gap: 6 }}>
-                        {!renombrando && (
-                          <button type="button" className="btn-xs" onClick={() => iniciarRenombrar(c)}>
-                            Renombrar
-                          </button>
+                        {editando ? (
+                          <>
+                            <button type="button" className="btn-xs" onClick={() => guardarEdicion(c)}>Guardar</button>
+                            <button type="button" className="btn-xs" onClick={cancelarEdicion}>Cancelar</button>
+                          </>
+                        ) : (
+                          <>
+                            <button type="button" className="btn-xs" onClick={() => iniciarEdicion(c)}>Editar</button>
+                            <button type="button" className="btn-xs" onClick={() => handleToggleActivo(c)}>
+                              {c.activo ? "Desactivar" : "Activar"}
+                            </button>
+                          </>
                         )}
-                        <button type="button" className="btn-xs" onClick={() => handleToggleActivo(c)}>
-                          {c.activo ? "Desactivar" : "Activar"}
-                        </button>
                       </td>
                     </tr>
                   );
