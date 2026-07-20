@@ -298,6 +298,7 @@ const CompetidoresTab = ({ ig, fb }) => {
   const [gestionAbierta, setGestionAbierta] = useState(false);
   const [tablaAbierta, setTablaAbierta] = useState(false);
   const [historiales, setHistoriales] = useState({});
+  const [plataformaSeleccionada, setPlataformaSeleccionada] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -372,6 +373,15 @@ const CompetidoresTab = ({ ig, fb }) => {
 
   const activo = perfiles.find((p) => p.id === seleccionado) || perfiles[0] || null;
 
+  // Pestaña de plataforma dentro de la tarjeta — se resetea sola cuando el
+  // perfil activo cambia y esa plataforma ya no aplica, sin necesitar un
+  // efecto: si lo guardado no es válido para el perfil actual, cae a la
+  // primera plataforma que tenga cargada.
+  const plataformasActivo = activo ? Object.keys(activo.plataformas) : [];
+  const plataformaMostrada = plataformasActivo.includes(plataformaSeleccionada)
+    ? plataformaSeleccionada
+    : plataformasActivo[0] || null;
+
   // "Tu marca" no cuenta como competidor real — si todavía no cargaste
   // ninguno, mostramos el formulario directo (sin el toggle de en medio),
   // porque sin eso esta pestaña no tiene nada que comparar todavía.
@@ -445,16 +455,30 @@ const CompetidoresTab = ({ ig, fb }) => {
                     </div>
                   </div>
 
-                  <div className="platform-section">
-                    {Object.entries(activo.plataformas).map(([plataforma, datos]) => (
+                  {plataformasActivo.length > 1 && (
+                    <div className="tabs" style={{ marginBottom: 12 }}>
+                      {plataformasActivo.map((pl) => (
+                        <button
+                          key={pl}
+                          type="button"
+                          className={`tab-btn ${plataformaMostrada === pl ? "active" : ""}`}
+                          onClick={() => setPlataformaSeleccionada(pl)}
+                        >
+                          {PLATFORM_LABEL[pl]}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
+                  {plataformaMostrada && (
+                    <div className="platform-section">
                       <PlatformCard
-                        key={plataforma}
-                        plataforma={plataforma}
-                        datos={datos}
-                        historial={historiales[datos.historialKey]}
+                        plataforma={plataformaMostrada}
+                        datos={activo.plataformas[plataformaMostrada]}
+                        historial={historiales[activo.plataformas[plataformaMostrada].historialKey]}
                       />
-                    ))}
-                  </div>
+                    </div>
+                  )}
                 </>
               )}
             </>
