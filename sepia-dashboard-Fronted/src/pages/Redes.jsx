@@ -153,18 +153,9 @@ const PLATFORM_TAG = { instagram: "IG", facebook: "FB" };
 // Evolución de seguidores — social_benchmark guarda una fila nueva por cada
 // corrida de sync (no pisa la anterior), así que esto se va llenando solo
 // con los días. Con menos de 2 puntos no hay curva que dibujar todavía.
-const SeguidoresHistorial = ({ competidorId }) => {
-  const [historial, setHistorial] = useState(null);
-
-  useEffect(() => {
-    if (!competidorId) return;
-    let cancelled = false;
-    getSocialBenchmarkHistorial(competidorId)
-      .then((payload) => { if (!cancelled) setHistorial(payload.historial || []); })
-      .catch(() => { if (!cancelled) setHistorial([]); });
-    return () => { cancelled = true; };
-  }, [competidorId]);
-
+// El historial se trae una sola vez arriba en CompetidoresTab (para todos
+// los competidores a la vez) y se pasa acá como prop, no se refetchea.
+const SeguidoresHistorial = ({ competidorId, historial }) => {
   if (!competidorId || !historial || historial.length < 2) return null;
 
   const serie = historial.map((h) => ({ ...h, dia: String(h.fecha_snapshot).slice(5, 10) }));
@@ -197,7 +188,7 @@ const SeguidoresHistorial = ({ competidorId }) => {
   );
 };
 
-const PlatformCard = ({ plataforma, datos }) => {
+const PlatformCard = ({ plataforma, datos, historial }) => {
   const metricas = [
     { label: "Seguidores", value: datos.seguidores != null ? fNumber(datos.seguidores) : null },
     { label: "Engagement", value: fPercent(datos.engagement_aprox) },
@@ -222,7 +213,7 @@ const PlatformCard = ({ plataforma, datos }) => {
           </div>
         ))}
       </div>
-      <SeguidoresHistorial competidorId={datos.competidor_id} />
+      <SeguidoresHistorial competidorId={datos.competidor_id} historial={historial} />
       {plataforma === "facebook" && faltanDatos && (
         <p className="platform-card-note">
           Meta solo entrega seguidores de páginas ajenas sin un trámite de revisión aparte — el resto de las métricas no está disponible.
@@ -235,10 +226,76 @@ const PlatformCard = ({ plataforma, datos }) => {
   );
 };
 
+// Diferencia entre el primer y el último snapshot de seguidores que tengamos
+// guardado — no está atado a ningún rango de fechas elegido, es "lo que
+// llevamos registrado desde que se agregó el competidor".
+const cambioDeSeguidores = (historial) => {
+  if (!historial || historial.length < 2) return null;
+  return historial[historial.length - 1].seguidores - historial[0].seguidores;
+};
+
+const fDelta = (n) => (n > 0 ? `+${fNumber(n)}` : fNumber(n));
+
+// Tabla comparativa estilo "Puntos de referencia" de Meta Business Suite —
+// una fila por página (perfil x plataforma), igual que allá.
+const ComparisonTable = ({ perfiles, historiales }) => {
+  const filas = perfiles.flatMap((p) =>
+    Object.entries(p.plataformas).map(([plataforma, datos]) => ({
+      perfil: p,
+      plataforma,
+      datos,
+      cambio: cambioDeSeguidores(historiales[datos.competidor_id]),
+    })),
+  );
+  filas.sort((a, b) => (b.datos.seguidores || 0) - (a.datos.seguidores || 0));
+
+  return (
+    <div className="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Página</th>
+            <th>Plataforma</th>
+            <th style={{ textAlign: "right" }}>Seguidores</th>
+            <th style={{ textAlign: "right" }}>Cambio</th>
+            <th style={{ textAlign: "right" }}>Publicaciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          {filas.map((f) => (
+            <tr key={`${f.perfil.id}:${f.plataforma}`}>
+              <td>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <Avatar
+                    fotoUrl={f.perfil.fotoUrl}
+                    nombre={f.perfil.nombre}
+                    color={f.perfil.esTuMarca ? "var(--accent)" : avatarColorFor(f.perfil.id)}
+                    size="sm"
+                  />
+                  {f.perfil.nombre}
+                  {f.perfil.esTuMarca && <span className="pill brand">Tu marca</span>}
+                </div>
+              </td>
+              <td>{PLATFORM_LABEL[f.plataforma]}</td>
+              <td style={{ textAlign: "right" }}>{f.datos.seguidores != null ? fNumber(f.datos.seguidores) : "—"}</td>
+              <td style={{ textAlign: "right", color: f.cambio > 0 ? "#22c55e" : f.cambio < 0 ? "#f87171" : undefined }}>
+                {f.cambio != null ? fDelta(f.cambio) : "—"}
+              </td>
+              <td style={{ textAlign: "right" }}>{f.datos.posts_count != null ? fNumber(f.datos.posts_count) : "—"}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+};
+
 const CompetidoresTab = ({ ig, fb }) => {
   const [competidores, setCompetidores] = useState(null);
   const [seleccionado, setSeleccionado] = useState(null);
   const [gestionAbierta, setGestionAbierta] = useState(false);
+  const [tablaAbierta, setTablaAbierta] = useState(false);
+  const [historiales, setHistoriales] = useState({});
 
   useEffect(() => {
     let cancelled = false;
@@ -247,6 +304,22 @@ const CompetidoresTab = ({ ig, fb }) => {
       .catch(() => { if (!cancelled) setCompetidores([]); });
     return () => { cancelled = true; };
   }, []);
+
+  // Un solo fetch de historial por competidor, apenas se conoce la lista —
+  // lo usan tanto el mini-gráfico de la tarjeta como la tabla comparativa,
+  // así que se trae una vez arriba en vez de repetirlo en cada uno.
+  useEffect(() => {
+    if (!competidores || competidores.length === 0) return;
+    let cancelled = false;
+    Promise.all(
+      competidores.map((c) =>
+        getSocialBenchmarkHistorial(c.competidor_id)
+          .then((payload) => [c.competidor_id, payload.historial || []])
+          .catch(() => [c.competidor_id, []]),
+      ),
+    ).then((pares) => { if (!cancelled) setHistoriales(Object.fromEntries(pares)); });
+    return () => { cancelled = true; };
+  }, [competidores]);
 
   const tuMarca = useMemo(() => buildTuMarcaProfile(ig, fb), [ig, fb]);
   // Competidores ordenados de mayor a menor engagement — el que no tiene
@@ -287,60 +360,76 @@ const CompetidoresTab = ({ ig, fb }) => {
               <span>Instagram completo · Facebook solo seguidores</span>
             </div>
             {!sinCompetidoresReales && (
-              <button type="button" className="btn-xs" onClick={() => setGestionAbierta((v) => !v)}>
-                {gestionAbierta ? "Ocultar gestión" : "+ Agregar / gestionar"}
-              </button>
+              <div style={{ display: "flex", gap: 8 }}>
+                <button type="button" className="btn-xs" onClick={() => setTablaAbierta((v) => !v)}>
+                  {tablaAbierta ? "Ver tarjetas" : "Ver tabla comparativa"}
+                </button>
+                <button type="button" className="btn-xs" onClick={() => setGestionAbierta((v) => !v)}>
+                  {gestionAbierta ? "Ocultar gestión" : "+ Agregar / gestionar"}
+                </button>
+              </div>
             )}
           </header>
 
-          <div className="profile-chip-row">
-            {perfiles.map((p) => (
-              <button
-                key={p.id}
-                type="button"
-                className={`profile-chip ${activo?.id === p.id ? "active" : ""}`}
-                onClick={() => setSeleccionado(p.id)}
-              >
-                <Avatar
-                  fotoUrl={p.fotoUrl}
-                  nombre={p.nombre}
-                  color={p.esTuMarca ? "var(--accent)" : avatarColorFor(p.id)}
-                  size="sm"
-                />
-                {p.nombre}
-                {p.id === liderId && <span className="pill leader">Líder</span>}
-              </button>
-            ))}
-          </div>
-
-          {activo && (
+          {tablaAbierta ? (
+            <ComparisonTable perfiles={perfiles} historiales={historiales} />
+          ) : (
             <>
-              <div className="profile-card-header">
-                <div className="profile-identity">
-                  <Avatar
-                    fotoUrl={activo.fotoUrl}
-                    nombre={activo.nombre}
-                    color={activo.esTuMarca ? "var(--accent)" : avatarColorFor(activo.id)}
-                    size="lg"
-                  />
-                  <div>
-                    <h3>
-                      {activo.nombre}
-                      {activo.esTuMarca && <span className="pill brand">Tu marca</span>}
-                      {activo.id === liderId && <span className="pill leader">Líder en engagement</span>}
-                    </h3>
-                    <p>
-                      {Object.keys(activo.plataformas).map((pl) => PLATFORM_LABEL[pl]).join(" · ") || "Sin plataformas cargadas"}
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="platform-section">
-                {Object.entries(activo.plataformas).map(([plataforma, datos]) => (
-                  <PlatformCard key={plataforma} plataforma={plataforma} datos={datos} />
+              <div className="profile-chip-row">
+                {perfiles.map((p) => (
+                  <button
+                    key={p.id}
+                    type="button"
+                    className={`profile-chip ${activo?.id === p.id ? "active" : ""}`}
+                    onClick={() => setSeleccionado(p.id)}
+                  >
+                    <Avatar
+                      fotoUrl={p.fotoUrl}
+                      nombre={p.nombre}
+                      color={p.esTuMarca ? "var(--accent)" : avatarColorFor(p.id)}
+                      size="sm"
+                    />
+                    {p.nombre}
+                    {p.id === liderId && <span className="pill leader">Líder</span>}
+                  </button>
                 ))}
               </div>
+
+              {activo && (
+                <>
+                  <div className="profile-card-header">
+                    <div className="profile-identity">
+                      <Avatar
+                        fotoUrl={activo.fotoUrl}
+                        nombre={activo.nombre}
+                        color={activo.esTuMarca ? "var(--accent)" : avatarColorFor(activo.id)}
+                        size="lg"
+                      />
+                      <div>
+                        <h3>
+                          {activo.nombre}
+                          {activo.esTuMarca && <span className="pill brand">Tu marca</span>}
+                          {activo.id === liderId && <span className="pill leader">Líder en engagement</span>}
+                        </h3>
+                        <p>
+                          {Object.keys(activo.plataformas).map((pl) => PLATFORM_LABEL[pl]).join(" · ") || "Sin plataformas cargadas"}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="platform-section">
+                    {Object.entries(activo.plataformas).map(([plataforma, datos]) => (
+                      <PlatformCard
+                        key={plataforma}
+                        plataforma={plataforma}
+                        datos={datos}
+                        historial={historiales[datos.competidor_id]}
+                      />
+                    ))}
+                  </div>
+                </>
+              )}
             </>
           )}
         </section>
