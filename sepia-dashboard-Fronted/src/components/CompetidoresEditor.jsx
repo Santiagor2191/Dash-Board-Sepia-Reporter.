@@ -19,6 +19,9 @@ export default function CompetidoresEditor() {
   const [handleFacebook, setHandleFacebook] = useState("");
   const [guardando, setGuardando] = useState(false);
 
+  const [renombrandoId, setRenombrandoId] = useState(null);
+  const [nombreEditado, setNombreEditado] = useState("");
+
   const idNombre = useId();
   const idHandleIg = useId();
   const idHandleFb = useId();
@@ -76,6 +79,33 @@ export default function CompetidoresEditor() {
       await cargarCompetidores();
     } catch (err) {
       setError(err?.message || "No se pudo actualizar el competidor.");
+    }
+  };
+
+  // Renombrar es la forma de "unir" 2 filas que ya existen (una de Instagram,
+  // otra de Facebook) en una sola tarjeta agrupada — el agrupamiento en la
+  // pestaña Competidores es por nombre_visible exacto, así que si quedaron
+  // con nombres distintos, esto es lo que lo arregla sin recrear nada.
+  const iniciarRenombrar = (competidor) => {
+    setRenombrandoId(competidor.id);
+    setNombreEditado(competidor.nombre_visible || competidor.handle);
+  };
+
+  const cancelarRenombrar = () => {
+    setRenombrandoId(null);
+    setNombreEditado("");
+  };
+
+  const guardarRenombrar = async (competidor) => {
+    const nombre = nombreEditado.trim();
+    if (!nombre) return;
+    try {
+      await updateCompetidorSocial(competidor.id, { nombre_visible: nombre });
+      setRenombrandoId(null);
+      setNombreEditado("");
+      await cargarCompetidores();
+    } catch (err) {
+      setError(err?.message || "No se pudo renombrar el competidor.");
     }
   };
 
@@ -160,16 +190,39 @@ export default function CompetidoresEditor() {
               <tbody>
                 {competidores.map((c) => {
                   const estado = estadoDe(c);
+                  const renombrando = renombrandoId === c.id;
                   return (
                     <tr key={c.id}>
                       <td>{PLATFORM_LABEL[c.plataforma] || c.plataforma}</td>
-                      <td>{c.nombre_visible || c.handle}</td>
+                      <td>
+                        {renombrando ? (
+                          <div style={{ display: "flex", gap: 6 }}>
+                            <input
+                              type="text"
+                              className="field-input"
+                              style={{ minWidth: 140 }}
+                              value={nombreEditado}
+                              onChange={(e) => setNombreEditado(e.target.value)}
+                              autoFocus
+                            />
+                            <button type="button" className="btn-xs" onClick={() => guardarRenombrar(c)}>Guardar</button>
+                            <button type="button" className="btn-xs" onClick={cancelarRenombrar}>Cancelar</button>
+                          </div>
+                        ) : (
+                          c.nombre_visible || c.handle
+                        )}
+                      </td>
                       <td>
                         <span className={`status-dot ${estado.clase}`} title={estado.detalle || undefined}>
                           {estado.texto}
                         </span>
                       </td>
-                      <td>
+                      <td style={{ display: "flex", gap: 6 }}>
+                        {!renombrando && (
+                          <button type="button" className="btn-xs" onClick={() => iniciarRenombrar(c)}>
+                            Renombrar
+                          </button>
+                        )}
                         <button type="button" className="btn-xs" onClick={() => handleToggleActivo(c)}>
                           {c.activo ? "Desactivar" : "Activar"}
                         </button>
