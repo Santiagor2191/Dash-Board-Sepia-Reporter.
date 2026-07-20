@@ -22,23 +22,31 @@ describe("CompetidoresEditor", () => {
     );
   });
 
-  it("guardar exitoso: refresca la lista", async () => {
+  it("guardar exitoso con las 2 redes: crea un competidor por plataforma con el mismo nombre", async () => {
     api.getCompetidoresSocial
       .mockResolvedValueOnce({ competidores: [] })
       .mockResolvedValueOnce({
-        competidores: [{ id: 1, plataforma: "instagram", handle: "nuevo", nombre_visible: "Nuevo", activo: true, last_error: null, last_synced_at: null }],
+        competidores: [
+          { id: 1, plataforma: "instagram", handle: "nuevo_ig", nombre_visible: "Nuevo", activo: true, last_error: null, last_synced_at: null },
+          { id: 2, plataforma: "facebook", handle: "nuevo_fb", nombre_visible: "Nuevo", activo: true, last_error: null, last_synced_at: null },
+        ],
       });
     api.createCompetidorSocial.mockResolvedValue({ ok: true });
 
     render(<CompetidoresEditor />);
     await waitFor(() => expect(screen.getByText(/todavía no cargaste/i)).toBeInTheDocument());
 
-    fireEvent.change(screen.getByLabelText(/handle/i), { target: { value: "nuevo" } });
+    fireEvent.change(screen.getByLabelText(/nombre del competidor/i), { target: { value: "Nuevo" } });
+    fireEvent.change(screen.getByLabelText(/instagram/i), { target: { value: "nuevo_ig" } });
+    fireEvent.change(screen.getByLabelText(/facebook/i), { target: { value: "nuevo_fb" } });
     fireEvent.click(screen.getByRole("button", { name: "Agregar competidor" }));
 
-    await waitFor(() => expect(screen.getByText("Nuevo")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getAllByText("Nuevo").length).toBeGreaterThan(0));
     expect(api.createCompetidorSocial).toHaveBeenCalledWith(
-      expect.objectContaining({ handle: "nuevo", plataforma: "instagram" }),
+      expect.objectContaining({ handle: "nuevo_ig", plataforma: "instagram", nombre_visible: "Nuevo" }),
+    );
+    expect(api.createCompetidorSocial).toHaveBeenCalledWith(
+      expect.objectContaining({ handle: "nuevo_fb", plataforma: "facebook", nombre_visible: "Nuevo" }),
     );
   });
 
@@ -49,12 +57,13 @@ describe("CompetidoresEditor", () => {
     render(<CompetidoresEditor />);
     await waitFor(() => expect(screen.getByText(/todavía no cargaste/i)).toBeInTheDocument());
 
-    fireEvent.change(screen.getByLabelText(/handle/i), { target: { value: "repetido" } });
+    fireEvent.change(screen.getByLabelText(/nombre del competidor/i), { target: { value: "Repetido" } });
+    fireEvent.change(screen.getByLabelText(/instagram/i), { target: { value: "repetido" } });
     fireEvent.click(screen.getByRole("button", { name: "Agregar competidor" }));
 
     await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("Ya existe ese competidor"));
-    // El handle tipeado sigue en el input, no se perdió
-    expect(screen.getByLabelText(/handle/i)).toHaveValue("repetido");
+    // Lo tipeado sigue en los inputs, no se perdió
+    expect(screen.getByLabelText(/instagram/i)).toHaveValue("repetido");
   });
 
   it("muestra 'sin datos recientes' cuando el competidor tiene last_error", async () => {

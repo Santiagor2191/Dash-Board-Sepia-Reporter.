@@ -1,11 +1,6 @@
 import { useEffect, useId, useState } from "react";
 import { getCompetidoresSocial, createCompetidorSocial, updateCompetidorSocial } from "../api.js";
 
-const PLATAFORMAS = [
-  { value: "instagram", label: "Instagram" },
-  { value: "facebook", label: "Facebook" },
-];
-
 const PLATFORM_LABEL = { instagram: "Instagram", facebook: "Facebook" };
 
 const estadoDe = (c) => {
@@ -19,14 +14,14 @@ export default function CompetidoresEditor() {
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState(null);
 
-  const [plataforma, setPlataforma] = useState("instagram");
-  const [handle, setHandle] = useState("");
   const [nombreVisible, setNombreVisible] = useState("");
+  const [handleInstagram, setHandleInstagram] = useState("");
+  const [handleFacebook, setHandleFacebook] = useState("");
   const [guardando, setGuardando] = useState(false);
 
-  const idPlataforma = useId();
-  const idHandle = useId();
   const idNombre = useId();
+  const idHandleIg = useId();
+  const idHandleFb = useId();
 
   const cargarCompetidores = async () => {
     setCargando(true);
@@ -45,15 +40,26 @@ export default function CompetidoresEditor() {
     cargarCompetidores();
   }, []);
 
+  // Un competidor = un nombre + hasta 2 handles (IG y/o FB) que comparten
+  // ese mismo nombre_visible — así el dashboard los agrupa en un solo perfil
+  // con las 2 tarjetas adentro, en vez de que dependa de tipear el mismo
+  // nombre "a mano" dos veces por separado (ahí es donde se desalineaban).
   const handleAgregar = async (event) => {
     event.preventDefault();
-    if (!handle.trim()) return;
+    const nombre = nombreVisible.trim();
+    const ig = handleInstagram.trim();
+    const fb = handleFacebook.trim();
+    if (!nombre || (!ig && !fb)) return;
 
     setGuardando(true);
     try {
-      await createCompetidorSocial({ plataforma, handle, nombre_visible: nombreVisible });
-      setHandle("");
+      const tareas = [];
+      if (ig) tareas.push(createCompetidorSocial({ plataforma: "instagram", handle: ig, nombre_visible: nombre }));
+      if (fb) tareas.push(createCompetidorSocial({ plataforma: "facebook", handle: fb, nombre_visible: nombre }));
+      await Promise.all(tareas);
       setNombreVisible("");
+      setHandleInstagram("");
+      setHandleFacebook("");
       setError(null);
       await cargarCompetidores();
     } catch (err) {
@@ -82,40 +88,38 @@ export default function CompetidoresEditor() {
 
       <form onSubmit={handleAgregar} className="competidor-form">
         <div className="field-group">
-          <label htmlFor={idPlataforma}>Plataforma</label>
-          <select
-            id={idPlataforma}
-            className="field-input"
-            value={plataforma}
-            onChange={(e) => setPlataforma(e.target.value)}
-          >
-            {PLATAFORMAS.map((p) => (
-              <option key={p.value} value={p.value}>{p.label}</option>
-            ))}
-          </select>
-        </div>
-
-        <div className="field-group">
-          <label htmlFor={idHandle}>Usuario / handle</label>
-          <input
-            id={idHandle}
-            type="text"
-            className="field-input"
-            placeholder="@handle"
-            value={handle}
-            onChange={(e) => setHandle(e.target.value)}
-          />
-        </div>
-
-        <div className="field-group">
-          <label htmlFor={idNombre}>Nombre visible</label>
+          <label htmlFor={idNombre}>Nombre del competidor</label>
           <input
             id={idNombre}
             type="text"
             className="field-input"
-            placeholder="Opcional"
+            placeholder="Ej: Coronas Tiaras"
             value={nombreVisible}
             onChange={(e) => setNombreVisible(e.target.value)}
+          />
+        </div>
+
+        <div className="field-group">
+          <label htmlFor={idHandleIg}>Instagram</label>
+          <input
+            id={idHandleIg}
+            type="text"
+            className="field-input"
+            placeholder="@usuario (opcional)"
+            value={handleInstagram}
+            onChange={(e) => setHandleInstagram(e.target.value)}
+          />
+        </div>
+
+        <div className="field-group">
+          <label htmlFor={idHandleFb}>Facebook</label>
+          <input
+            id={idHandleFb}
+            type="text"
+            className="field-input"
+            placeholder="usuario de la Página (opcional)"
+            value={handleFacebook}
+            onChange={(e) => setHandleFacebook(e.target.value)}
           />
         </div>
 
@@ -123,6 +127,11 @@ export default function CompetidoresEditor() {
           {guardando ? "Agregando..." : "Agregar competidor"}
         </button>
       </form>
+
+      <p style={{ color: "var(--muted)", fontSize: "0.78rem", marginTop: -6, marginBottom: 14 }}>
+        Completá al menos una red — si cargás las dos, quedan agrupadas bajo el mismo nombre en una sola tarjeta.
+        El usuario de Facebook puede ser distinto al de Instagram (es el de la Página, no el del perfil personal).
+      </p>
 
       {error && <div className="empty-state" role="alert">{error}</div>}
 
