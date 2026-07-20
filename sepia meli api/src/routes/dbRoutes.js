@@ -174,6 +174,33 @@ export const createDbRouter = ({
     }
   });
 
+  // Historial de seguidores de un competidor — social_benchmark guarda una
+  // fila nueva por cada corrida de sync (no pisa la anterior), así que esto
+  // ya viene acumulando datos desde el primer /cron/social-sync.
+  router.get("/social-benchmark-historial/:competidorId", async (req, res) => {
+    try {
+      const competidorId = Number(req.params.competidorId);
+      if (!Number.isInteger(competidorId) || competidorId <= 0) {
+        return res.status(400).json({ ok: false, mensaje: "competidorId inválido" });
+      }
+      const [rows] = await dbPool.query(
+        `SELECT seguidores, fecha_snapshot FROM social_benchmark
+         WHERE competidor_id = $1 AND seguidores IS NOT NULL
+         ORDER BY fecha_snapshot ASC
+         LIMIT 180`,
+        [competidorId],
+      );
+      return res.json({ ok: true, historial: rows });
+    } catch (error) {
+      return sendInternalError(
+        res,
+        "Error consultando historial de seguidores",
+        "No se pudo traer el historial de seguidores",
+        error,
+      );
+    }
+  });
+
   router.get("/competidores-social", async (req, res) => {
     try {
       const [rows] = await dbPool.query(

@@ -76,8 +76,16 @@ const makeFakeDbPool = () => {
   ];
   let nextId = 2;
 
+  const historial = [
+    { seguidores: 900, fecha_snapshot: "2026-07-16" },
+    { seguidores: 950, fecha_snapshot: "2026-07-17" },
+  ];
+
   return {
     query: async (sql, params = []) => {
+      if (sql.includes("FROM social_benchmark")) {
+        return params[0] === 1 ? [historial] : [[]];
+      }
       if (sql.includes("FROM social_posts")) return [posts];
       if (sql.includes("FROM competidores_social c")) return [competidores.map((c) => ({ ...c, competidor_id: c.id, seguidores: null, posts_count: null, engagement_aprox: null, cadencia_semanal: null, fecha_snapshot: null }))];
       if (sql.startsWith("SELECT id, plataforma, handle, nombre_visible, activo")) return [competidores];
@@ -133,6 +141,20 @@ test("GET /db/social-benchmark devuelve competidores activos", async (t) => {
   assert.equal(response.status, 200);
   assert.equal(data.competidores.length, 1);
   assert.equal(data.competidores[0].handle, "compa");
+});
+
+test("GET /db/social-benchmark-historial/:id devuelve la serie de seguidores", async (t) => {
+  const router = createDbRouter({ dbPool: makeFakeDbPool() });
+  const server = await startServer({ mountPath: "/db", router });
+  t.after(async () => server.close());
+
+  const { response, data } = await requestJson(server.baseUrl, "/db/social-benchmark-historial/1");
+  assert.equal(response.status, 200);
+  assert.equal(data.historial.length, 2);
+  assert.equal(data.historial[1].seguidores, 950);
+
+  const malo = await requestJson(server.baseUrl, "/db/social-benchmark-historial/abc");
+  assert.equal(malo.response.status, 400);
 });
 
 test("POST /db/competidores-social normaliza el handle y valida plataforma", async (t) => {

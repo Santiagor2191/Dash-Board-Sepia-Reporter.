@@ -13,7 +13,7 @@ import MetaDateRangePicker from "../components/MetaDateRangePicker";
 import HeatmapTable from "../components/HeatmapTable";
 import CompetidoresEditor from "../components/CompetidoresEditor";
 import Avatar from "../components/Avatar";
-import { getMetaRedes, getSocialPosts, getSocialBenchmark } from "../api";
+import { getMetaRedes, getSocialPosts, getSocialBenchmark, getSocialBenchmarkHistorial } from "../api";
 import { calcDelta, fCurrency, fNumber, fmtYmd, daysAgo, prettyDate } from "../utils";
 
 const TABS = [
@@ -150,6 +150,53 @@ const buildTuMarcaProfile = (ig, fb) => {
 const PLATFORM_LABEL = { instagram: "Instagram", facebook: "Facebook" };
 const PLATFORM_TAG = { instagram: "IG", facebook: "FB" };
 
+// Evolución de seguidores — social_benchmark guarda una fila nueva por cada
+// corrida de sync (no pisa la anterior), así que esto se va llenando solo
+// con los días. Con menos de 2 puntos no hay curva que dibujar todavía.
+const SeguidoresHistorial = ({ competidorId }) => {
+  const [historial, setHistorial] = useState(null);
+
+  useEffect(() => {
+    if (!competidorId) return;
+    let cancelled = false;
+    getSocialBenchmarkHistorial(competidorId)
+      .then((payload) => { if (!cancelled) setHistorial(payload.historial || []); })
+      .catch(() => { if (!cancelled) setHistorial([]); });
+    return () => { cancelled = true; };
+  }, [competidorId]);
+
+  if (!competidorId || !historial || historial.length < 2) return null;
+
+  const serie = historial.map((h) => ({ ...h, dia: String(h.fecha_snapshot).slice(5, 10) }));
+
+  return (
+    <div style={{ width: "100%", height: 90, marginTop: 12 }}>
+      <div className="profile-metric-label" style={{ marginBottom: 4 }}>Seguidores en el tiempo</div>
+      <ResponsiveContainer width="100%" height="100%">
+        <AreaChart data={serie} margin={{ top: 4, right: 4, left: 4, bottom: 0 }}>
+          <defs>
+            <linearGradient id={`segFill-${competidorId}`} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#c9793f" stopOpacity={0.3} />
+              <stop offset="100%" stopColor="#c9793f" stopOpacity={0.02} />
+            </linearGradient>
+          </defs>
+          <XAxis dataKey="dia" tick={{ fill: "var(--muted)", fontSize: 10 }} tickLine={false} axisLine={false} />
+          <YAxis hide domain={["auto", "auto"]} />
+          <Tooltip contentStyle={tooltipStyle} formatter={(v) => fNumber(v)} />
+          <Area
+            type="monotone"
+            dataKey="seguidores"
+            stroke="#c9793f"
+            strokeWidth={2}
+            fill={`url(#segFill-${competidorId})`}
+            dot={false}
+          />
+        </AreaChart>
+      </ResponsiveContainer>
+    </div>
+  );
+};
+
 const PlatformCard = ({ plataforma, datos }) => {
   const metricas = [
     { label: "Seguidores", value: datos.seguidores != null ? fNumber(datos.seguidores) : null },
@@ -175,6 +222,7 @@ const PlatformCard = ({ plataforma, datos }) => {
           </div>
         ))}
       </div>
+      <SeguidoresHistorial competidorId={datos.competidor_id} />
       {plataforma === "facebook" && faltanDatos && (
         <p className="platform-card-note">
           Meta solo entrega seguidores de páginas ajenas sin un trámite de revisión aparte — el resto de las métricas no está disponible.

@@ -117,6 +117,8 @@ export const getSyncLog = (limit = 20) => request(`/admin/sync-log?limit=${limit
 
 export const getSocialPosts = (limit = 50) => request(`/db/social-posts?limit=${limit}`);
 export const getSocialBenchmark = () => request("/db/social-benchmark");
+export const getSocialBenchmarkHistorial = (competidorId) =>
+  request(`/db/social-benchmark-historial/${competidorId}`);
 export const getCompetidoresSocial = () => request("/db/competidores-social");
 export const createCompetidorSocial = (competidor) =>
   request("/db/competidores-social", { method: "POST", body: JSON.stringify(competidor) });
