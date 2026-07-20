@@ -85,6 +85,15 @@ const avatarColorFor = (key) => {
 
 const fPercent = (v) => (v != null ? `${(v * 100).toFixed(1)}%` : null);
 
+// Mayor engagement entre las plataformas cargadas de un perfil (hoy solo
+// Instagram lo calcula — Facebook siempre da null, ver PlatformCard).
+const engagementDe = (perfil) => {
+  const valores = Object.values(perfil.plataformas)
+    .map((d) => d.engagement_aprox)
+    .filter((v) => v != null);
+  return valores.length ? Math.max(...valores) : null;
+};
+
 // La base de datos guarda un competidor+plataforma por fila (decisión del
 // eng-review: no hay concepto de "perfil" unico). Acá se agrupan por nombre
 // visible (o handle si no tiene nombre) SOLO para mostrar, sin tocar el dato
@@ -192,10 +201,24 @@ const CompetidoresTab = ({ ig, fb }) => {
   }, []);
 
   const tuMarca = useMemo(() => buildTuMarcaProfile(ig, fb), [ig, fb]);
-  const perfiles = useMemo(() => {
-    const propios = buildProfiles(competidores);
-    return tuMarca ? [tuMarca, ...propios] : propios;
-  }, [competidores, tuMarca]);
+  // Competidores ordenados de mayor a menor engagement — el que no tiene
+  // dato todavía (sin sincronizar) va al final, no arriba mezclado.
+  const propios = useMemo(
+    () => [...buildProfiles(competidores)].sort((a, b) => {
+      const ea = engagementDe(a);
+      const eb = engagementDe(b);
+      if (ea == null && eb == null) return 0;
+      if (ea == null) return 1;
+      if (eb == null) return -1;
+      return eb - ea;
+    }),
+    [competidores],
+  );
+  const perfiles = useMemo(
+    () => (tuMarca ? [tuMarca, ...propios] : propios),
+    [propios, tuMarca],
+  );
+  const liderId = propios.length && engagementDe(propios[0]) != null ? propios[0].id : null;
 
   if (competidores === null) return <div className="empty-state">Cargando competidores...</div>;
 
@@ -237,6 +260,7 @@ const CompetidoresTab = ({ ig, fb }) => {
                   size="sm"
                 />
                 {p.nombre}
+                {p.id === liderId && <span className="pill leader">Líder</span>}
               </button>
             ))}
           </div>
@@ -255,6 +279,7 @@ const CompetidoresTab = ({ ig, fb }) => {
                     <h3>
                       {activo.nombre}
                       {activo.esTuMarca && <span className="pill brand">Tu marca</span>}
+                      {activo.id === liderId && <span className="pill leader">Líder en engagement</span>}
                     </h3>
                     <p>
                       {Object.keys(activo.plataformas).map((pl) => PLATFORM_LABEL[pl]).join(" · ") || "Sin plataformas cargadas"}
