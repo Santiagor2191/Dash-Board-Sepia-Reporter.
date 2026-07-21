@@ -115,6 +115,15 @@ const buildProfiles = (competidores) => {
   return [...map.values()];
 };
 
+// Promedio de un campo sobre los posts recientes — misma cuenta que se hace
+// del lado del servidor para likes_promedio/comentarios_promedio de los
+// competidores (últimos ~12 posts), para que el número sea comparable.
+const promedioDe = (posts, campo) => {
+  if (!posts?.length) return null;
+  const total = posts.reduce((acc, p) => acc + (p[campo] || 0), 0);
+  return Number((total / posts.length).toFixed(1));
+};
+
 // "Tu marca" se arma con los datos que YA se cargaron para la pestaña
 // Resumen (ig/fb) — no dispara una consulta nueva. Reusa la misma cuenta de
 // cadencia semanal que ya se calcula para las Recomendaciones, para que el
@@ -128,6 +137,8 @@ const buildTuMarcaProfile = (ig, fb) => {
       engagement_aprox: ig.alcance > 0 ? ig.interacciones / ig.alcance : null,
       posts_count: ig.publicaciones_total,
       cadencia_semanal: cadenciaSemanalDePosts(ig.posts),
+      likes_promedio: promedioDe(ig.posts, "likes"),
+      comentarios_promedio: promedioDe(ig.posts, "comentarios"),
       historialKey: "own:instagram",
     };
   }
