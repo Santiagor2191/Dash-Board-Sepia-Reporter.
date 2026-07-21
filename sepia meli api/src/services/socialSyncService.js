@@ -74,20 +74,59 @@ export const createSocialSyncService = ({ metaSocialService, dbPool }) => {
         });
 
         await dbPool.query(
-          `INSERT INTO social_benchmark (competidor_id, seguidores, posts_count, engagement_aprox, cadencia_semanal)
-           VALUES ($1,$2,$3,$4,$5)`,
+          `INSERT INTO social_benchmark (
+             competidor_id, seguidores, posts_count, engagement_aprox, cadencia_semanal,
+             likes_promedio, comentarios_promedio, pct_reels, pct_carousel, pct_imagen
+           ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
           [
             competidor.id,
             benchmark.seguidores,
             benchmark.posts_count,
             benchmark.engagement_aprox,
             benchmark.cadencia_semanal,
+            benchmark.likes_promedio ?? null,
+            benchmark.comentarios_promedio ?? null,
+            benchmark.pct_reels ?? null,
+            benchmark.pct_carousel ?? null,
+            benchmark.pct_imagen ?? null,
           ],
         );
         await dbPool.query(
           `UPDATE competidores_social SET last_error = NULL, last_synced_at = now(), foto_url = $2 WHERE id = $1`,
           [competidor.id, benchmark.foto_url ?? null],
         );
+
+        for (const post of benchmark.posts_detalle || []) {
+          await dbPool.query(
+            `INSERT INTO competidor_posts (
+               competidor_id, post_id, fecha_publicacion, permalink, miniatura_url,
+               media_type, media_product_type, caption, likes, comentarios, synced_at
+             ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10, now())
+             ON CONFLICT (competidor_id, post_id) DO UPDATE SET
+               fecha_publicacion = EXCLUDED.fecha_publicacion,
+               permalink = EXCLUDED.permalink,
+               miniatura_url = EXCLUDED.miniatura_url,
+               media_type = EXCLUDED.media_type,
+               media_product_type = EXCLUDED.media_product_type,
+               caption = EXCLUDED.caption,
+               likes = EXCLUDED.likes,
+               comentarios = EXCLUDED.comentarios,
+               synced_at = now()`,
+            [
+              competidor.id,
+              post.post_id,
+              post.fecha_publicacion,
+              post.permalink,
+              post.miniatura_url,
+              post.media_type,
+              post.media_product_type,
+              post.caption,
+              post.likes,
+              post.comentarios,
+            ],
+          );
+        }
+
         ok += 1;
       } catch (error) {
         conError += 1;

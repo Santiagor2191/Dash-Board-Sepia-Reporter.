@@ -1157,6 +1157,48 @@ tbody tr:hover {
   font-family: inherit;
 }
 
+.competitor-posts-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 10px;
+}
+
+.competitor-post-card {
+  display: block;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  background: rgba(148, 163, 184, 0.06);
+  text-decoration: none;
+  color: var(--text);
+}
+
+.competitor-post-card img {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  object-fit: cover;
+  display: block;
+}
+
+.competitor-post-placeholder {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted);
+  font-size: 0.72rem;
+  background: rgba(148, 163, 184, 0.1);
+}
+
+.competitor-post-meta {
+  display: flex;
+  gap: 10px;
+  padding: 6px 8px;
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+
 .platform-card-note {
   margin: 10px 0 0;
   color: var(--muted);

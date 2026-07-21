@@ -157,7 +157,8 @@ export const createDbRouter = ({
         `SELECT DISTINCT ON (c.id)
                 c.id AS competidor_id, c.plataforma, c.handle, c.nombre_visible, c.foto_url,
                 c.last_error, c.last_synced_at,
-                b.seguidores, b.posts_count, b.engagement_aprox, b.cadencia_semanal, b.fecha_snapshot
+                b.seguidores, b.posts_count, b.engagement_aprox, b.cadencia_semanal, b.fecha_snapshot,
+                b.likes_promedio, b.comentarios_promedio, b.pct_reels, b.pct_carousel, b.pct_imagen
          FROM competidores_social c
          LEFT JOIN social_benchmark b ON b.competidor_id = c.id
          WHERE c.activo = true
@@ -196,6 +197,35 @@ export const createDbRouter = ({
         res,
         "Error consultando historial de seguidores",
         "No se pudo traer el historial de seguidores",
+        error,
+      );
+    }
+  });
+
+  // Publicaciones recientes de un competidor — competidor_posts guarda el
+  // ÚLTIMO ESTADO de cada post (se pisa en cada sync, no es histórico), igual
+  // que social_posts hace para los posts propios.
+  router.get("/competidor-posts/:competidorId", async (req, res) => {
+    try {
+      const competidorId = Number(req.params.competidorId);
+      if (!Number.isInteger(competidorId) || competidorId <= 0) {
+        return res.status(400).json({ ok: false, mensaje: "competidorId inválido" });
+      }
+      const [rows] = await dbPool.query(
+        `SELECT post_id, fecha_publicacion, permalink, miniatura_url, media_type,
+                media_product_type, caption, likes, comentarios
+         FROM competidor_posts
+         WHERE competidor_id = $1
+         ORDER BY fecha_publicacion DESC NULLS LAST
+         LIMIT 12`,
+        [competidorId],
+      );
+      return res.json({ ok: true, posts: rows });
+    } catch (error) {
+      return sendInternalError(
+        res,
+        "Error consultando competidor_posts",
+        "No se pudieron traer las publicaciones del competidor",
         error,
       );
     }

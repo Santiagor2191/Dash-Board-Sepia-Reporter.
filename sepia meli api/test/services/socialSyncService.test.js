@@ -87,6 +87,38 @@ test("syncCompetidores: un competidor con error no bloquea a los demás", async 
   assert.equal(benchmarkInserts.length, 2); // solo los 2 que funcionaron
 });
 
+test("syncCompetidores: guarda cada post individual del competidor en competidor_posts", async () => {
+  const competidores = [{ id: 5, plataforma: "instagram", handle: "compA" }];
+  const dbPool = makeFakeDbPool({ competidores });
+  const metaSocialService = {
+    fetchPostsForSync: async () => ({ configured: true, posts: [] }),
+    fetchCompetitorBenchmark: async () => ({
+      seguidores: 1000,
+      posts_count: 10,
+      engagement_aprox: 0.02,
+      cadencia_semanal: 3,
+      likes_promedio: 50,
+      comentarios_promedio: 4,
+      pct_reels: 40,
+      pct_carousel: 30,
+      pct_imagen: 30,
+      posts_detalle: [
+        { post_id: "p1", fecha_publicacion: "2026-07-18", permalink: "x", miniatura_url: "y", media_type: "IMAGE", media_product_type: "FEED", caption: "hola", likes: 10, comentarios: 1 },
+        { post_id: "p2", fecha_publicacion: "2026-07-19", permalink: "x2", miniatura_url: "y2", media_type: "VIDEO", media_product_type: "REELS", caption: "chau", likes: 20, comentarios: 2 },
+      ],
+    }),
+  };
+
+  const service = createSocialSyncService({ metaSocialService, dbPool });
+  const resultado = await service.correrSync();
+
+  assert.equal(resultado.competidores.ok, 1);
+  const postInserts = dbPool.calls.filter((c) => c.sql.includes("INSERT INTO competidor_posts"));
+  assert.equal(postInserts.length, 2);
+  assert.equal(postInserts[0].params[1], "p1");
+  assert.equal(postInserts[1].params[1], "p2");
+});
+
 test("syncMarca: guarda un snapshot por plataforma con datos", async () => {
   const dbPool = makeFakeDbPool();
   const metaSocialService = {

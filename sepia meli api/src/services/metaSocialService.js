@@ -340,24 +340,53 @@ export const createMetaSocialService = ({ accessToken, adAccountId }) => {
         const { ig } = await resolvePageAndIg();
         if (!ig) throw new Error("No hay cuenta de Instagram vinculada para consultar Business Discovery.");
         const data = await graphGet(`${ig.id}`, {
-          fields: `business_discovery.username(${handle}){followers_count,media_count,profile_picture_url,media.limit(12){like_count,comments_count,timestamp}}`,
+          fields: `business_discovery.username(${handle}){followers_count,media_count,profile_picture_url,media.limit(12){id,media_type,media_product_type,media_url,thumbnail_url,permalink,caption,like_count,comments_count,timestamp}}`,
         });
         const bd = data?.business_discovery;
         if (!bd) throw new Error(`No se encontró la cuenta @${handle} (¿no es una cuenta Business/Creator?).`);
         const posts = bd.media?.data || [];
-        const totalLikesComments = posts.reduce(
-          (acc, p) => acc + (Number(p.like_count) || 0) + (Number(p.comments_count) || 0),
-          0,
-        );
+        const totalLikes = posts.reduce((acc, p) => acc + (Number(p.like_count) || 0), 0);
+        const totalComentarios = posts.reduce((acc, p) => acc + (Number(p.comments_count) || 0), 0);
         const seguidores = Number(bd.followers_count) || 0;
-        const engagementAprox = seguidores > 0 && posts.length ? totalLikesComments / posts.length / seguidores : null;
+        const engagementAprox = seguidores > 0 && posts.length
+          ? (totalLikes + totalComentarios) / posts.length / seguidores
+          : null;
         const cadenciaSemanal = computeCadenciaSemanal(posts.map((p) => p.timestamp));
+
+        // Mezcla de formatos: Reels es el más específico (media_product_type),
+        // luego carrusel (media_type), el resto (fotos y videos de feed) cae
+        // en "Imagen" — misma simplificación en 3 categorías que usa MB Suite.
+        const formatoDe = (p) => {
+          if (p.media_product_type === "REELS") return "reels";
+          if (p.media_type === "CAROUSEL_ALBUM") return "carousel";
+          return "imagen";
+        };
+        const pct = (n) => (posts.length ? Number(((n / posts.length) * 100).toFixed(1)) : null);
+        const conteoFormato = { reels: 0, carousel: 0, imagen: 0 };
+        posts.forEach((p) => { conteoFormato[formatoDe(p)] += 1; });
+
         return {
           seguidores,
           posts_count: Number(bd.media_count) || 0,
           engagement_aprox: engagementAprox,
           cadencia_semanal: cadenciaSemanal,
           foto_url: bd.profile_picture_url || null,
+          likes_promedio: posts.length ? Number((totalLikes / posts.length).toFixed(1)) : null,
+          comentarios_promedio: posts.length ? Number((totalComentarios / posts.length).toFixed(1)) : null,
+          pct_reels: pct(conteoFormato.reels),
+          pct_carousel: pct(conteoFormato.carousel),
+          pct_imagen: pct(conteoFormato.imagen),
+          posts_detalle: posts.map((p) => ({
+            post_id: p.id,
+            fecha_publicacion: p.timestamp,
+            permalink: p.permalink || null,
+            miniatura_url: p.thumbnail_url || p.media_url || null,
+            media_type: p.media_type || null,
+            media_product_type: p.media_product_type || null,
+            caption: (p.caption || "").slice(0, 200),
+            likes: Number(p.like_count) || 0,
+            comentarios: Number(p.comments_count) || 0,
+          })),
         };
       }
 
@@ -370,6 +399,12 @@ export const createMetaSocialService = ({ accessToken, adAccountId }) => {
           engagement_aprox: null,
           cadencia_semanal: null,
           foto_url: data.picture?.data?.url || null,
+          likes_promedio: null,
+          comentarios_promedio: null,
+          pct_reels: null,
+          pct_carousel: null,
+          pct_imagen: null,
+          posts_detalle: [],
         };
       }
 

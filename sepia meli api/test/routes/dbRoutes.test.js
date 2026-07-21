@@ -84,10 +84,16 @@ const makeFakeDbPool = () => {
     { plataforma: "instagram", seguidores: 590, fecha_snapshot: "2026-07-16" },
     { plataforma: "instagram", seguidores: 594, fecha_snapshot: "2026-07-17" },
   ];
+  const competidorPosts = [
+    { post_id: "cp1", fecha_publicacion: "2026-07-18", permalink: "x", miniatura_url: "y", media_type: "IMAGE", media_product_type: "FEED", caption: "hola", likes: 5, comentarios: 1 },
+  ];
 
   return {
     query: async (sql, params = []) => {
       if (sql.includes("FROM marca_historial")) return [marcaHistorial];
+      if (sql.includes("FROM competidor_posts")) {
+        return params[0] === 1 ? [competidorPosts] : [[]];
+      }
       if (sql.includes("FROM social_benchmark")) {
         return params[0] === 1 ? [historial] : [[]];
       }
@@ -166,6 +172,20 @@ test("GET /db/social-benchmark-historial/:id devuelve la serie de seguidores", a
   assert.equal(data.historial[1].seguidores, 950);
 
   const malo = await requestJson(server.baseUrl, "/db/social-benchmark-historial/abc");
+  assert.equal(malo.response.status, 400);
+});
+
+test("GET /db/competidor-posts/:id devuelve las publicaciones del competidor", async (t) => {
+  const router = createDbRouter({ dbPool: makeFakeDbPool() });
+  const server = await startServer({ mountPath: "/db", router });
+  t.after(async () => server.close());
+
+  const { response, data } = await requestJson(server.baseUrl, "/db/competidor-posts/1");
+  assert.equal(response.status, 200);
+  assert.equal(data.posts.length, 1);
+  assert.equal(data.posts[0].post_id, "cp1");
+
+  const malo = await requestJson(server.baseUrl, "/db/competidor-posts/abc");
   assert.equal(malo.response.status, 400);
 });
 

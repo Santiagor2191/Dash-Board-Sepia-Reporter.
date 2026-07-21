@@ -13,7 +13,7 @@ import MetaDateRangePicker from "../components/MetaDateRangePicker";
 import HeatmapTable from "../components/HeatmapTable";
 import CompetidoresEditor from "../components/CompetidoresEditor";
 import Avatar from "../components/Avatar";
-import { getMetaRedes, getSocialPosts, getSocialBenchmark, getSocialBenchmarkHistorial, getMarcaHistorial } from "../api";
+import { getMetaRedes, getSocialPosts, getSocialBenchmark, getSocialBenchmarkHistorial, getMarcaHistorial, getCompetidorPosts } from "../api";
 import { calcDelta, fCurrency, fNumber, fmtYmd, daysAgo, prettyDate } from "../utils";
 
 const TABS = [
@@ -190,10 +190,95 @@ const SeguidoresHistorial = ({ historialKey, historial }) => {
   );
 };
 
+// Reusa colores ya presentes en AVATAR_PALETTE — mismo lenguaje visual que
+// el resto del dashboard en vez de inventar una paleta nueva para esto solo.
+const FORMATO_COLOR = { reels: "#8b5cf6", carousel: "#14b8a6", imagen: "#f59e0b" };
+const FORMATO_LABEL = { reels: "Reels", carousel: "Carrusel", imagen: "Imagen" };
+
+// Barra apilada con el % de cada formato en los últimos posts del competidor
+// (viene calculado del lado del servidor, sobre los últimos 12 posts que
+// trae Business Discovery). Solo Instagram — Facebook no expone esto acá.
+const MezclaFormatos = ({ datos }) => {
+  const partes = [
+    { key: "reels", pct: datos.pct_reels },
+    { key: "carousel", pct: datos.pct_carousel },
+    { key: "imagen", pct: datos.pct_imagen },
+  ].filter((p) => p.pct != null && p.pct > 0);
+
+  if (!partes.length) return null;
+
+  return (
+    <div style={{ marginTop: 14 }}>
+      <div className="profile-metric-label" style={{ marginBottom: 6 }}>Mezcla de formatos</div>
+      <div style={{ display: "flex", height: 8, borderRadius: 999, overflow: "hidden" }}>
+        {partes.map((p) => (
+          <div key={p.key} style={{ width: `${p.pct}%`, background: FORMATO_COLOR[p.key] }} />
+        ))}
+      </div>
+      <div style={{ display: "flex", gap: 14, marginTop: 8, flexWrap: "wrap" }}>
+        {partes.map((p) => (
+          <span key={p.key} style={{ display: "flex", alignItems: "center", gap: 5, fontSize: "0.76rem", color: "var(--muted)" }}>
+            <span style={{ width: 8, height: 8, borderRadius: "50%", background: FORMATO_COLOR[p.key], display: "inline-block" }} />
+            {FORMATO_LABEL[p.key]} · {p.pct}%
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+// Grilla de las últimas publicaciones del competidor — competidor_posts
+// guarda el último estado de cada post (se pisa en cada sync, no es
+// histórico). Se carga por separado del resto de la tarjeta porque son
+// varias filas y no todos los perfiles la necesitan a la vez.
+const PublicacionesRecientes = ({ competidorId }) => {
+  const [posts, setPosts] = useState(null);
+
+  useEffect(() => {
+    if (!competidorId) return;
+    let cancelled = false;
+    getCompetidorPosts(competidorId)
+      .then((payload) => { if (!cancelled) setPosts(payload.posts || []); })
+      .catch(() => { if (!cancelled) setPosts([]); });
+    return () => { cancelled = true; };
+  }, [competidorId]);
+
+  if (!competidorId || !posts || posts.length === 0) return null;
+
+  return (
+    <div style={{ marginTop: 14 }}>
+      <div className="profile-metric-label" style={{ marginBottom: 8 }}>Publicaciones recientes</div>
+      <div className="competitor-posts-grid">
+        {posts.map((p) => (
+          <a
+            key={p.post_id}
+            href={p.permalink || undefined}
+            target="_blank"
+            rel="noreferrer"
+            className="competitor-post-card"
+          >
+            {p.miniatura_url ? (
+              <img src={p.miniatura_url} alt={p.caption ? p.caption.slice(0, 60) : "Publicación del competidor"} />
+            ) : (
+              <div className="competitor-post-placeholder">Sin imagen</div>
+            )}
+            <div className="competitor-post-meta">
+              <span>♥ {fNumber(p.likes)}</span>
+              <span>💬 {fNumber(p.comentarios)}</span>
+            </div>
+          </a>
+        ))}
+      </div>
+    </div>
+  );
+};
+
 const PlatformCard = ({ plataforma, datos, historial }) => {
   const metricas = [
     { label: "Seguidores", value: datos.seguidores != null ? fNumber(datos.seguidores) : null },
-    { label: "Engagement", value: fPercent(datos.engagement_aprox) },
+    { label: "Engagement rate", value: fPercent(datos.engagement_aprox) },
+    { label: "Likes promedio", value: datos.likes_promedio != null ? fNumber(datos.likes_promedio) : null },
+    { label: "Comentarios prom.", value: datos.comentarios_promedio != null ? fNumber(datos.comentarios_promedio) : null },
     { label: "Posts/semana", value: datos.cadencia_semanal ?? null },
     { label: "Publicaciones", value: datos.posts_count != null ? fNumber(datos.posts_count) : null },
   ];
@@ -216,6 +301,10 @@ const PlatformCard = ({ plataforma, datos, historial }) => {
         ))}
       </div>
       <SeguidoresHistorial historialKey={datos.historialKey} historial={historial} />
+      <MezclaFormatos datos={datos} />
+      {plataforma === "instagram" && (
+        <PublicacionesRecientes key={datos.historialKey} competidorId={datos.competidor_id} />
+      )}
       {plataforma === "facebook" && faltanDatos && (
         <p className="platform-card-note">
           Meta solo entrega seguidores de páginas ajenas sin un trámite de revisión aparte — el resto de las métricas no está disponible.
