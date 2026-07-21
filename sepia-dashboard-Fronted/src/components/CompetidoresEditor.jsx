@@ -1,5 +1,5 @@
 import { useEffect, useId, useState } from "react";
-import { getCompetidoresSocial, createCompetidorSocial, updateCompetidorSocial } from "../api.js";
+import { getCompetidoresSocial, createCompetidorSocial, updateCompetidorSocial, deleteCompetidorSocial } from "../api.js";
 
 const PLATFORM_LABEL = { instagram: "Instagram", facebook: "Facebook" };
 
@@ -80,6 +80,22 @@ export default function CompetidoresEditor() {
       await cargarCompetidores();
     } catch (err) {
       setError(err?.message || "No se pudo actualizar el competidor.");
+    }
+  };
+
+  // A diferencia de Desactivar (reversible, conserva historial), esto borra
+  // la fila y su historial de verdad — se usa para limpiar filas mal
+  // cargadas (handle equivocado, duplicados), por eso pide confirmación.
+  const handleEliminar = async (competidor) => {
+    const etiqueta = competidor.nombre_visible || competidor.handle;
+    if (!window.confirm(`¿Eliminar "${etiqueta}" (${PLATFORM_LABEL[competidor.plataforma]})? Esto borra también su historial guardado y no se puede deshacer.`)) {
+      return;
+    }
+    try {
+      await deleteCompetidorSocial(competidor.id);
+      await cargarCompetidores();
+    } catch (err) {
+      setError(err?.message || "No se pudo eliminar el competidor.");
     }
   };
 
@@ -246,6 +262,7 @@ export default function CompetidoresEditor() {
                             <button type="button" className="btn-xs" onClick={() => handleToggleActivo(c)}>
                               {c.activo ? "Desactivar" : "Activar"}
                             </button>
+                            <button type="button" className="btn-xs" onClick={() => handleEliminar(c)}>Eliminar</button>
                           </>
                         )}
                       </td>

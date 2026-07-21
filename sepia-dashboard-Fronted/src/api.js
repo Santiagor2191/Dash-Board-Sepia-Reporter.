@@ -126,3 +126,5 @@ export const createCompetidorSocial = (competidor) =>
   request("/db/competidores-social", { method: "POST", body: JSON.stringify(competidor) });
 export const updateCompetidorSocial = (id, cambios) =>
   request(`/db/competidores-social/${id}`, { method: "PUT", body: JSON.stringify(cambios) });
+export const deleteCompetidorSocial = (id) =>
+  request(`/db/competidores-social/${id}`, { method: "DELETE" });

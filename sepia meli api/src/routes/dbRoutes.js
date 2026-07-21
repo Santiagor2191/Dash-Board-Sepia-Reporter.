@@ -353,5 +353,32 @@ export const createDbRouter = ({
     }
   });
 
+  // Borrado real (no el "activo=false" de arriba) — se usa para limpiar
+  // filas mal cargadas (handle equivocado, duplicados). Los benchmarks y
+  // posts guardados de ese competidor se van con el ON DELETE CASCADE.
+  router.delete("/competidores-social/:id", async (req, res) => {
+    try {
+      const id = Number(req.params.id);
+      if (!Number.isInteger(id) || id <= 0) {
+        return res.status(400).json({ ok: false, mensaje: "id inválido" });
+      }
+      const [rows] = await dbPool.query(
+        `DELETE FROM competidores_social WHERE id = $1 RETURNING id`,
+        [id],
+      );
+      if (!rows.length) {
+        return res.status(404).json({ ok: false, mensaje: "Competidor no encontrado" });
+      }
+      return res.json({ ok: true });
+    } catch (error) {
+      return sendInternalError(
+        res,
+        "Error borrando competidor",
+        "No se pudo borrar el competidor",
+        error,
+      );
+    }
+  });
+
   return router;
 };

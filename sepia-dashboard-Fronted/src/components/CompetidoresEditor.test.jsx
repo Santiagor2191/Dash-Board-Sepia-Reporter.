@@ -7,6 +7,7 @@ vi.mock("../api.js", () => ({
   getCompetidoresSocial: vi.fn(),
   createCompetidorSocial: vi.fn(),
   updateCompetidorSocial: vi.fn(),
+  deleteCompetidorSocial: vi.fn(),
 }));
 
 beforeEach(() => {
@@ -73,5 +74,36 @@ describe("CompetidoresEditor", () => {
 
     render(<CompetidoresEditor />);
     await waitFor(() => expect(screen.getByText("Sin datos recientes")).toBeInTheDocument());
+  });
+
+  it("eliminar: pide confirmación y no borra si se cancela", async () => {
+    api.getCompetidoresSocial.mockResolvedValue({
+      competidores: [{ id: 3, plataforma: "instagram", handle: "compa", nombre_visible: "Comp A", activo: true, last_error: null, last_synced_at: null }],
+    });
+    vi.spyOn(window, "confirm").mockReturnValue(false);
+
+    render(<CompetidoresEditor />);
+    await waitFor(() => expect(screen.getByText("Comp A")).toBeInTheDocument());
+
+    fireEvent.click(screen.getByRole("button", { name: "Eliminar" }));
+    expect(window.confirm).toHaveBeenCalled();
+    expect(api.deleteCompetidorSocial).not.toHaveBeenCalled();
+  });
+
+  it("eliminar: borra y refresca la lista si se confirma", async () => {
+    api.getCompetidoresSocial
+      .mockResolvedValueOnce({
+        competidores: [{ id: 3, plataforma: "instagram", handle: "compa", nombre_visible: "Comp A", activo: true, last_error: null, last_synced_at: null }],
+      })
+      .mockResolvedValueOnce({ competidores: [] });
+    api.deleteCompetidorSocial.mockResolvedValue({ ok: true });
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+
+    render(<CompetidoresEditor />);
+    await waitFor(() => expect(screen.getByText("Comp A")).toBeInTheDocument());
+
+    fireEvent.click(screen.getByRole("button", { name: "Eliminar" }));
+    expect(api.deleteCompetidorSocial).toHaveBeenCalledWith(3);
+    await waitFor(() => expect(screen.getByText(/todavía no cargaste/i)).toBeInTheDocument());
   });
 });

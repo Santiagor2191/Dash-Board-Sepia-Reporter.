@@ -133,6 +133,13 @@ const makeFakeDbPool = () => {
         if (setsActivo) comp.activo = params[idx++];
         return [[comp]];
       }
+      if (sql.startsWith("DELETE FROM competidores_social")) {
+        const id = params[0];
+        const idx = competidores.findIndex((c) => c.id === id);
+        if (idx === -1) return [[]];
+        const [borrado] = competidores.splice(idx, 1);
+        return [[{ id: borrado.id }]];
+      }
       return [[]];
     },
   };
@@ -240,6 +247,22 @@ test("PUT /db/competidores-social/:id permite editar el handle y detecta choques
     body: { handle: "otro" },
   });
   assert.equal(choque.response.status, 409);
+});
+
+test("DELETE /db/competidores-social/:id borra la fila", async (t) => {
+  const router = createDbRouter({ dbPool: makeFakeDbPool() });
+  const server = await startServer({ mountPath: "/db", router });
+  t.after(async () => server.close());
+
+  const borrado = await requestJson(server.baseUrl, "/db/competidores-social/1", { method: "DELETE" });
+  assert.equal(borrado.response.status, 200);
+  assert.equal(borrado.data.ok, true);
+
+  const listado = await requestJson(server.baseUrl, "/db/competidores-social");
+  assert.equal(listado.data.competidores.find((c) => c.id === 1), undefined);
+
+  const denuevo = await requestJson(server.baseUrl, "/db/competidores-social/1", { method: "DELETE" });
+  assert.equal(denuevo.response.status, 404);
 });
 
 test("PUT /db/competidores-social/:id desactiva sin borrar histórico", async (t) => {
