@@ -67,6 +67,20 @@ describe("CompetidoresEditor", () => {
     expect(screen.getByLabelText(/instagram/i)).toHaveValue("repetido");
   });
 
+  it("nombre vacío: no llama a la API y avisa en vez de no hacer nada", async () => {
+    api.getCompetidoresSocial.mockResolvedValue({ competidores: [] });
+
+    render(<CompetidoresEditor />);
+    await waitFor(() => expect(screen.getByText(/todavía no cargaste/i)).toBeInTheDocument());
+
+    fireEvent.change(screen.getByLabelText(/instagram/i), { target: { value: "bassica.co" } });
+    fireEvent.change(screen.getByLabelText(/facebook/i), { target: { value: "bassica.co" } });
+    fireEvent.click(screen.getByRole("button", { name: "Agregar competidor" }));
+
+    await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent(/falta el nombre/i));
+    expect(api.createCompetidorSocial).not.toHaveBeenCalled();
+  });
+
   it("muestra 'sin datos recientes' cuando el competidor tiene last_error", async () => {
     api.getCompetidoresSocial.mockResolvedValue({
       competidores: [{ id: 2, plataforma: "instagram", handle: "roto", nombre_visible: null, activo: true, last_error: "cuenta no encontrada", last_synced_at: "2026-07-16" }],

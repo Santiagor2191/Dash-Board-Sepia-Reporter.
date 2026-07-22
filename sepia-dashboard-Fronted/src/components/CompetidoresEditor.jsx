@@ -53,7 +53,14 @@ export default function CompetidoresEditor() {
     const nombre = nombreVisible.trim();
     const ig = handleInstagram.trim();
     const fb = handleFacebook.trim();
-    if (!nombre || (!ig && !fb)) return;
+    if (!nombre) {
+      setError("Falta el nombre del competidor.");
+      return;
+    }
+    if (!ig && !fb) {
+      setError("Completá al menos un usuario de Instagram o Facebook.");
+      return;
+    }
 
     setGuardando(true);
     try {
