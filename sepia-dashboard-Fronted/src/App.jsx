@@ -22,6 +22,7 @@ const NAV_ITEMS = [
   { path: "/publicidad", label: "Publicidad", icon: "AD" },
   { path: "/ventas-meta-ads", label: "Ventas Meta Ads", icon: "MA" },
   { path: "/redes", label: "Redes", icon: "IG" },
+  { path: "/crm", label: "CRM", icon: "CR" },
   { path: "/rentabilidad", label: "Rentabilidad", icon: "$" },
   { path: "/conversion", label: "Conversion", icon: "%" },
   { path: "/sync", label: "Sync", icon: "⟳" },
@@ -229,6 +230,7 @@ export default function App() {
   };
 
   const currentLabel = NAV_ITEMS.find((n) => n.path === location.pathname)?.label || "Dashboard";
+  const isCrmPage = location.pathname === "/crm";
 
   const handleLogin = async (event) => {
     event.preventDefault();
@@ -343,16 +345,20 @@ export default function App() {
             </NavLink>
           ))}
         </nav>
-        <div className="sidebar-filters">
-          <div className="sidebar-section-title">Filtro activo</div>
-          <div className="sidebar-chip-row">
-            <span className="chip">{appliedRange.label}: {prettyDate(appliedRange.since)} → {prettyDate(appliedRange.until)}</span>
-            <span className="chip">{COMPARISON_OPTIONS.find((o) => o.id === appliedComparison)?.label}</span>
+        {!isCrmPage && (
+          <div className="sidebar-filters">
+            <div className="sidebar-section-title">Filtro activo</div>
+            <div className="sidebar-chip-row">
+              <span className="chip">{appliedRange.label}: {prettyDate(appliedRange.since)} → {prettyDate(appliedRange.until)}</span>
+              <span className="chip">{COMPARISON_OPTIONS.find((o) => o.id === appliedComparison)?.label}</span>
+            </div>
           </div>
-        </div>
-        <div className="sidebar-footer">
-          <button type="button" className="btn btn-muted" onClick={resetFilters}>Reset</button>
-        </div>
+        )}
+        {!isCrmPage && (
+          <div className="sidebar-footer">
+            <button type="button" className="btn btn-muted" onClick={resetFilters}>Reset</button>
+          </div>
+        )}
       </aside>
 
       <button type="button" className={`mobile-overlay ${sidebarMobileOpen ? "is-active" : ""}`} aria-label="Cerrar menu lateral" onClick={() => setSidebarMobileOpen(false)} />
@@ -364,30 +370,36 @@ export default function App() {
               <button type="button" className="icon-btn" aria-label={sidebarMobileOpen ? "Cerrar menu" : "Abrir menu"} aria-expanded={isMobileViewport ? sidebarMobileOpen : !sidebarCollapsed} onClick={toggleSidebar}>&#9776;</button>
               <div className="topbar-title-wrap">
                 <h1>{currentLabel}</h1>
-                <p>{periodSummary}</p>
+                {!isCrmPage && <p>{periodSummary}</p>}
               </div>
             </div>
             <div className="topbar-right">
-              <MetaDateRangePicker
-                range={appliedRange}
-                onApply={applyRange}
-                extraPresets={buildExtraRangePresets()}
-              />
-              <div className="comparison-group">
-                {COMPARISON_OPTIONS.map((opt) => (
-                  <button key={opt.id} type="button" className={`comparison-btn ${appliedComparison === opt.id ? "active" : ""}`} onClick={() => setAppliedComparison(opt.id)}>{opt.label}</button>
-                ))}
-              </div>
+              {!isCrmPage && (
+                <MetaDateRangePicker
+                  range={appliedRange}
+                  onApply={applyRange}
+                  extraPresets={buildExtraRangePresets()}
+                />
+              )}
+              {!isCrmPage && (
+                <div className="comparison-group">
+                  {COMPARISON_OPTIONS.map((opt) => (
+                    <button key={opt.id} type="button" className={`comparison-btn ${appliedComparison === opt.id ? "active" : ""}`} onClick={() => setAppliedComparison(opt.id)}>{opt.label}</button>
+                  ))}
+                </div>
+              )}
               <button type="button" className="btn btn-theme" onClick={() => setTheme((p) => p === "dark" ? "light" : "dark")}>{theme === "dark" ? "Oscuro" : "Claro"}</button>
               {auth.enabled && <button type="button" className="btn btn-muted" onClick={handleLogout}>Salir</button>}
             </div>
           </div>
-          <div className="status-row">
-            <span className={`status-badge ${connection.source === "mysql" ? "live" : "mock"}`}>{dataMode}</span>
-            {connection.source === "mysql" && liveRangeSummary && <span className="status-badge">Rango: {liveRangeSummary}</span>}
-            <span className="status-badge">Ordenes: {fNumber(filteredAll.length)}</span>
-            {connection.error && <span className="status-badge error">Error: {connection.error}</span>}
-          </div>
+          {!isCrmPage && (
+            <div className="status-row">
+              <span className={`status-badge ${connection.source === "mysql" ? "live" : "mock"}`}>{dataMode}</span>
+              {connection.source === "mysql" && liveRangeSummary && <span className="status-badge">Rango: {liveRangeSummary}</span>}
+              <span className="status-badge">Ordenes: {fNumber(filteredAll.length)}</span>
+              {connection.error && <span className="status-badge error">Error: {connection.error}</span>}
+            </div>
+          )}
         </header>
 
         <div className="content">

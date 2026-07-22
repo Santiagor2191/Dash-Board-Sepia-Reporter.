@@ -14,6 +14,7 @@ const Conversion = lazy(() => import("./pages/Conversion.jsx"));
 const VentasMetaAds = lazy(() => import("./pages/VentasMetaAds.jsx"));
 const Redes = lazy(() => import("./pages/Redes.jsx"));
 const SyncAdmin = lazy(() => import("./pages/SyncAdmin.jsx"));
+const Crm = lazy(() => import("./pages/Crm.jsx"));
 
 const renderPage = (Component) => (
   <Suspense fallback={<div className="empty-state">Cargando modulo...</div>}>
@@ -35,6 +36,7 @@ createRoot(document.getElementById("root")).render(
           <Route path="conversion" element={renderPage(Conversion)} />
           <Route path="ventas-meta-ads" element={renderPage(VentasMetaAds)} />
           <Route path="redes" element={renderPage(Redes)} />
+          <Route path="crm" element={renderPage(Crm)} />
           <Route path="sync" element={renderPage(SyncAdmin)} />
         </Route>
       </Routes>
