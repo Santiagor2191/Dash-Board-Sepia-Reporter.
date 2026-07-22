@@ -8,6 +8,7 @@ import {
   getRentabilidadCostosMap,
 } from "./api";
 import MetaDateRangePicker from "./components/MetaDateRangePicker";
+import { CRM_SECTIONS } from "./crmSections.js";
 import {
   COMPARISON_OPTIONS, MOBILE_BREAKPOINT,
   fNumber, fDate, prettyDate, buildExtraRangePresets, DEFAULT_MAX_RANGE,
@@ -15,17 +16,17 @@ import {
 import "./App.css";
 
 const NAV_ITEMS = [
-  { path: "/", label: "Dashboard", icon: "[]" },
-  { path: "/analytics", label: "Analytics", icon: "/\\" },
-  { path: "/ordenes", label: "Ordenes", icon: "OD" },
-  { path: "/inventario", label: "Inventario", icon: "IN" },
-  { path: "/publicidad", label: "Publicidad", icon: "AD" },
-  { path: "/ventas-meta-ads", label: "Ventas Meta Ads", icon: "MA" },
-  { path: "/redes", label: "Redes", icon: "IG" },
-  { path: "/crm", label: "CRM", icon: "CR" },
-  { path: "/rentabilidad", label: "Rentabilidad", icon: "$" },
-  { path: "/conversion", label: "Conversion", icon: "%" },
-  { path: "/sync", label: "Sync", icon: "⟳" },
+  { type: "link", path: "/", label: "Dashboard", icon: "[]" },
+  { type: "link", path: "/analytics", label: "Analytics", icon: "/\\" },
+  { type: "link", path: "/ordenes", label: "Ordenes", icon: "OD" },
+  { type: "link", path: "/inventario", label: "Inventario", icon: "IN" },
+  { type: "link", path: "/publicidad", label: "Publicidad", icon: "AD" },
+  { type: "link", path: "/ventas-meta-ads", label: "Ventas Meta Ads", icon: "MA" },
+  { type: "link", path: "/redes", label: "Redes", icon: "IG" },
+  { type: "group", key: "crm", label: "CRM", icon: "CR", basePath: "/crm", children: CRM_SECTIONS },
+  { type: "link", path: "/rentabilidad", label: "Rentabilidad", icon: "$" },
+  { type: "link", path: "/conversion", label: "Conversion", icon: "%" },
+  { type: "link", path: "/sync", label: "Sync", icon: "⟳" },
 ];
 
 export default function App() {
@@ -39,6 +40,7 @@ export default function App() {
   const [isMobileViewport, setIsMobileViewport] = useState(() => typeof window !== "undefined" ? window.innerWidth <= MOBILE_BREAKPOINT : false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [sidebarMobileOpen, setSidebarMobileOpen] = useState(false);
+  const [crmExpanded, setCrmExpanded] = useState(false);
   const [loginPassword, setLoginPassword] = useState("");
   const [auth, setAuth] = useState({
     ready: false,
@@ -93,6 +95,10 @@ export default function App() {
     document.body.style.overflow = sidebarMobileOpen ? "hidden" : "";
     return () => { document.body.style.overflow = prev; };
   }, [isMobileViewport, sidebarMobileOpen]);
+
+  useEffect(() => {
+    if (location.pathname.startsWith("/crm")) setCrmExpanded(true);
+  }, [location.pathname]);
 
   useEffect(() => {
     let cancelled = false;
@@ -229,8 +235,10 @@ export default function App() {
     setSidebarCollapsed((p) => !p);
   };
 
-  const currentLabel = NAV_ITEMS.find((n) => n.path === location.pathname)?.label || "Dashboard";
-  const isCrmPage = location.pathname === "/crm";
+  const isCrmPage = location.pathname === "/crm" || location.pathname.startsWith("/crm/");
+  const currentLabel = isCrmPage
+    ? "CRM"
+    : NAV_ITEMS.find((n) => n.type === "link" && n.path === location.pathname)?.label || "Dashboard";
 
   const handleLogin = async (event) => {
     event.preventDefault();
@@ -333,17 +341,49 @@ export default function App() {
           </div>
         </div>
         <nav className="sidebar-nav">
-          {NAV_ITEMS.map((item) => (
-            <NavLink
-              key={item.path}
-              to={item.path}
-              end={item.path === "/"}
-              className={({ isActive }) => `nav-item ${isActive ? "active" : ""}`}
-              onClick={() => setSidebarMobileOpen(false)}
-            >
-              <span>{item.icon}</span><span>{item.label}</span>
-            </NavLink>
-          ))}
+          {NAV_ITEMS.map((item) => {
+            if (item.type === "group") {
+              const isGroupActive = location.pathname.startsWith(item.basePath);
+              return (
+                <div key={item.key} className="nav-group">
+                  <button
+                    type="button"
+                    className={`nav-item nav-group-toggle ${isGroupActive ? "active" : ""}`}
+                    aria-expanded={crmExpanded}
+                    onClick={() => setCrmExpanded((p) => !p)}
+                  >
+                    <span>{item.icon}</span><span>{item.label}</span>
+                    <span className="nav-group-caret">{crmExpanded ? "▾" : "▸"}</span>
+                  </button>
+                  {crmExpanded && (
+                    <div className="nav-group-children">
+                      {item.children.map((child) => (
+                        <NavLink
+                          key={child.slug}
+                          to={`${item.basePath}/${child.slug}`}
+                          className={({ isActive }) => `nav-item nav-subitem ${isActive ? "active" : ""}`}
+                          onClick={() => setSidebarMobileOpen(false)}
+                        >
+                          <span>{child.label}</span>
+                        </NavLink>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            }
+            return (
+              <NavLink
+                key={item.path}
+                to={item.path}
+                end={item.path === "/"}
+                className={({ isActive }) => `nav-item ${isActive ? "active" : ""}`}
+                onClick={() => setSidebarMobileOpen(false)}
+              >
+                <span>{item.icon}</span><span>{item.label}</span>
+              </NavLink>
+            );
+          })}
         </nav>
         {!isCrmPage && (
           <div className="sidebar-filters">

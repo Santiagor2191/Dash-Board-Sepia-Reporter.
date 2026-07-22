@@ -1,10 +1,16 @@
 import { useEffect, useRef, useState } from "react";
+import { useParams } from "react-router-dom";
+import { CRM_SECTIONS } from "../crmSections.js";
 
-const DEFAULT_CRM_URL = "https://crm.sepiamodaymas.com";
-export const CRM_URL = import.meta.env.VITE_CRM_URL || DEFAULT_CRM_URL;
+const DEFAULT_CRM_ORIGIN = "https://crm.sepiamodaymas.com";
+export const CRM_URL = import.meta.env.VITE_CRM_URL || DEFAULT_CRM_ORIGIN;
 export const CRM_LOAD_TIMEOUT_MS = 15000;
 
 export default function Crm() {
+  const { section } = useParams();
+  const current = CRM_SECTIONS.find((s) => s.slug === section) || CRM_SECTIONS[0];
+  const iframeSrc = `${CRM_URL}${current.crmPath}`;
+
   const [status, setStatus] = useState("loading");
   const [reloadKey, setReloadKey] = useState(0);
   const timeoutRef = useRef(null);
@@ -15,7 +21,7 @@ export default function Crm() {
       setStatus((prev) => (prev === "loading" ? "timeout" : prev));
     }, CRM_LOAD_TIMEOUT_MS);
     return () => clearTimeout(timeoutRef.current);
-  }, [reloadKey]);
+  }, [reloadKey, iframeSrc]);
 
   const handleLoad = () => {
     clearTimeout(timeoutRef.current);
@@ -45,13 +51,13 @@ export default function Crm() {
         </div>
       )}
       <iframe
-        key={reloadKey}
-        src={CRM_URL}
-        title="CRM Sepia"
+        key={`${reloadKey}-${iframeSrc}`}
+        src={iframeSrc}
+        title={`CRM Sepia - ${current.label}`}
         className="crm-iframe"
         onLoad={handleLoad}
       />
-      <a href={CRM_URL} target="_blank" rel="noopener noreferrer" className="crm-escape-link">
+      <a href={iframeSrc} target="_blank" rel="noopener noreferrer" className="crm-escape-link">
         Abrir CRM en pestaña nueva ↗
       </a>
     </section>

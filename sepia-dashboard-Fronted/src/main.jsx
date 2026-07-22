@@ -37,6 +37,7 @@ createRoot(document.getElementById("root")).render(
           <Route path="ventas-meta-ads" element={renderPage(VentasMetaAds)} />
           <Route path="redes" element={renderPage(Redes)} />
           <Route path="crm" element={renderPage(Crm)} />
+          <Route path="crm/:section" element={renderPage(Crm)} />
           <Route path="sync" element={renderPage(SyncAdmin)} />
         </Route>
       </Routes>

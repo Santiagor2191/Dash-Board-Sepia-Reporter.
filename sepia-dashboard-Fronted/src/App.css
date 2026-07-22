@@ -196,6 +196,40 @@ body {
   color: var(--text);
 }
 
+.nav-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.nav-group-toggle {
+  width: 100%;
+  font: inherit;
+  text-align: left;
+}
+
+.nav-group-caret {
+  margin-left: auto;
+  font-size: 0.7rem;
+  color: var(--muted);
+}
+
+.nav-group-children {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-left: 22px;
+}
+
+.nav-subitem {
+  padding: 7px 12px;
+  font-size: 0.86rem;
+}
+
+.app-layout.sidebar-collapsed .nav-group-children {
+  display: none;
+}
+
 .app-layout.sidebar-collapsed .nav-item span:last-child,
 .app-layout.sidebar-collapsed .sidebar-filters,
 .app-layout.sidebar-collapsed .sidebar-footer,
