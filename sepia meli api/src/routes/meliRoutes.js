@@ -8,6 +8,15 @@ const ITEM_BATCH_SIZE = 20;
 const ITEM_BATCH_CONCURRENCY = 4;
 const CATEGORY_LOOKUP_CONCURRENCY = 6;
 const VISITS_LOOKUP_CONCURRENCY = 8;
+// Las tendencias de MeLi se recalculan una vez por semana: cachear 24h de sobra.
+const TRENDS_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+const TRENDS_LOOKUP_CONCURRENCY = 4;
+const TRENDS_KEYWORDS_LIMIT = 20;
+const SEO_DIAGNOSES = new Set([
+  "visitas_sin_conversion",
+  "sin_traccion",
+  "buena_conversion_pocas_visitas",
+]);
 
 const chunk = (items, size) => {
   const batches = [];
@@ -55,6 +64,7 @@ export const createMeliRouter = ({ mlGet, meliOrdersService }) => {
   let inventoryInFlight = null;
   let conversionCache = null;
   let conversionInFlight = null;
+  const trendsCache = new Map();
 
   const invalidateDerivedCaches = () => {
     conversionCache = null;
@@ -303,6 +313,8 @@ export const createMeliRouter = ({ mlGet, meliOrdersService }) => {
         price: item.price,
         thumbnail: item.thumbnail,
         permalink: item.permalink,
+        category_id: item.category_id,
+        category_name: item.category_name,
         available_quantity: item.available_quantity,
         listing_type_id: item.listing_type_id,
         visits_30d: visits,
@@ -373,6 +385,30 @@ export const createMeliRouter = ({ mlGet, meliOrdersService }) => {
         conversionInFlight = null;
       }
     }
+  };
+
+  // Palabras mas buscadas de una categoria. ~9 de cada 52 categorias no tienen
+  // tendencias publicadas y responden 404: eso no es un error, es lista vacia.
+  const getCategoryTrends = async (siteId, categoryId) => {
+    const cacheKey = `${siteId}:${categoryId}`;
+    const cached = trendsCache.get(cacheKey);
+    if (cached && Date.now() - cached.fetchedAt < TRENDS_CACHE_TTL_MS) {
+      return cached.keywords;
+    }
+
+    let keywords = [];
+    try {
+      const data = await mlGet(`/trends/${siteId}/${categoryId}`);
+      keywords = (Array.isArray(data) ? data : [])
+        .map((entry) => entry?.keyword)
+        .filter(Boolean)
+        .slice(0, TRENDS_KEYWORDS_LIMIT);
+    } catch {
+      keywords = [];
+    }
+
+    trendsCache.set(cacheKey, { fetchedAt: Date.now(), keywords });
+    return keywords;
   };
 
   router.get("/me", async (req, res) => {
@@ -475,6 +511,47 @@ export const createMeliRouter = ({ mlGet, meliOrdersService }) => {
         res,
         "Error consultando /meli/conversion",
         "No se pudo consultar datos de conversion",
+        error,
+      );
+    }
+  });
+
+  router.get("/seo-titulos", async (req, res) => {
+    try {
+      const force = String(req.query.force || "").toLowerCase() === "true";
+      const me = await mlGet("/users/me");
+      const siteId = me?.site_id || "MCO";
+      const { cached, data } = await getConversionPayload(me.id, { force });
+
+      const flojas = data.items.filter((item) => SEO_DIAGNOSES.has(item.diagnosis));
+      const categoryIds = [
+        ...new Set(flojas.map((item) => item.category_id).filter(Boolean)),
+      ];
+      const trendEntries = await mapWithConcurrency(
+        categoryIds,
+        TRENDS_LOOKUP_CONCURRENCY,
+        async (categoryId) => [categoryId, await getCategoryTrends(siteId, categoryId)],
+      );
+      const trendsMap = new Map(trendEntries);
+
+      return res.json({
+        ok: true,
+        cached,
+        site_id: siteId,
+        total: flojas.length,
+        categorias_sin_tendencias: categoryIds.filter(
+          (categoryId) => !(trendsMap.get(categoryId) || []).length,
+        ).length,
+        items: flojas.map((item) => ({
+          ...item,
+          keywords: trendsMap.get(item.category_id) || [],
+        })),
+      });
+    } catch (error) {
+      return sendInternalError(
+        res,
+        "Error consultando /meli/seo-titulos",
+        "No se pudieron consultar las tendencias de Mercado Libre",
         error,
       );
     }

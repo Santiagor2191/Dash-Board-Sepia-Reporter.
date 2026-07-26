@@ -103,6 +103,8 @@ export const getInventory = (force = false) =>
   request(`/meli/inventory${force ? "?force=true" : ""}`);
 export const getConversion = (force = false) =>
   request(`/meli/conversion${force ? "?force=true" : ""}`);
+export const getSeoTitulos = (force = false) =>
+  request(`/meli/seo-titulos${force ? "?force=true" : ""}`);
 export const getAdsMetrics = () => request("/ads/metrics");
 export const getAdsDiagnose = () => request("/ads/diagnose");
 export const getRentabilidadResumen = () => request("/api/rentabilidad/resumen");

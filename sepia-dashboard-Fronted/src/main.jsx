@@ -11,6 +11,7 @@ const Ordenes = lazy(() => import("./pages/Ordenes.jsx"));
 const Inventario = lazy(() => import("./pages/Inventario.jsx"));
 const Rentabilidad = lazy(() => import("./pages/Rentabilidad.jsx"));
 const Conversion = lazy(() => import("./pages/Conversion.jsx"));
+const SeoTitulos = lazy(() => import("./pages/SeoTitulos.jsx"));
 const VentasMetaAds = lazy(() => import("./pages/VentasMetaAds.jsx"));
 const Redes = lazy(() => import("./pages/Redes.jsx"));
 const SyncAdmin = lazy(() => import("./pages/SyncAdmin.jsx"));
@@ -34,6 +35,7 @@ createRoot(document.getElementById("root")).render(
           <Route path="inventario" element={renderPage(Inventario)} />
           <Route path="rentabilidad" element={renderPage(Rentabilidad)} />
           <Route path="conversion" element={renderPage(Conversion)} />
+          <Route path="seo-titulos" element={renderPage(SeoTitulos)} />
           <Route path="ventas-meta-ads" element={renderPage(VentasMetaAds)} />
           <Route path="redes" element={renderPage(Redes)} />
           <Route path="crm" element={renderPage(Crm)} />

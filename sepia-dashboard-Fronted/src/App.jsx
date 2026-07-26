@@ -26,6 +26,7 @@ const NAV_ITEMS = [
   { type: "group", key: "crm", label: "CRM", icon: "CR", basePath: "/crm", children: CRM_SECTIONS },
   { type: "link", path: "/rentabilidad", label: "Rentabilidad", icon: "$" },
   { type: "link", path: "/conversion", label: "Conversion", icon: "%" },
+  { type: "link", path: "/seo-titulos", label: "SEO Titulos", icon: "TT" },
   { type: "link", path: "/sync", label: "Sync", icon: "⟳" },
 ];
 
