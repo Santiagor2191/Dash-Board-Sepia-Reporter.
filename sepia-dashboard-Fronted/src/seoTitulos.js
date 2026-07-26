@@ -26,13 +26,50 @@ export const palabrasDe = (texto = "") =>
     .split(" ")
     .filter((palabra) => palabra && !STOPWORDS.has(palabra) && (palabra.length >= 3 || /\d/.test(palabra)));
 
+// "sandalias" y "sandalia" son la misma palabra para el comprador. Sin esto,
+// una busqueda relevante se veria como ajena solo por el plural.
+export const raiz = (palabra = "") => {
+  if (palabra.length > 4 && palabra.endsWith("es")) return palabra.slice(0, -2);
+  if (palabra.length > 3 && palabra.endsWith("s")) return palabra.slice(0, -1);
+  return palabra;
+};
+
+const raicesDe = (texto) => new Set(palabrasDe(texto).map(raiz));
+
+// Las tendencias son de la CATEGORIA entera, no del nicho. En "Sandalias y
+// Chanclas" aparecen "nike mind 001" y "crocs rayo mcqueen", que no tienen
+// nada que ver con una sandalia de nina de fiesta. Solo cuentan las busquedas
+// que comparten alguna palabra con el producto.
+export const esRelacionada = (keyword, tituloBase) => {
+  const delProducto = raicesDe(tituloBase);
+  return palabrasDe(keyword).some((palabra) => delProducto.has(raiz(palabra)));
+};
+
 export const analizarTitulos = ({
   tituloActual = "",
+  tituloBase = tituloActual,
   titulosCompetencia = [],
   keywordsTendencia = [],
 }) => {
-  const mias = new Set(palabrasDe(tituloActual));
-  const deTendencia = new Set(keywordsTendencia.flatMap((keyword) => palabrasDe(keyword)));
+  // Por raiz: si el titulo dice "Sandalia", no tiene sentido pedirle "sandalias".
+  const mias = raicesDe(tituloActual);
+  const relacionadas = keywordsTendencia.filter((keyword) => esRelacionada(keyword, tituloBase));
+
+  // Una palabra que aparece en UNA sola busqueda casi siempre es una marca ajena
+  // ("sandalias skechers mujer", "sandalias birkenstock colombia"). Sugerirla
+  // seria peligroso: poner una marca que no vendes puede costarte la publicacion.
+  // Lo que de verdad busca la gente se repite en varias busquedas.
+  const vecesEnTendencias = new Map();
+  for (const keyword of relacionadas) {
+    for (const palabra of new Set(palabrasDe(keyword).map(raiz))) {
+      vecesEnTendencias.set(palabra, (vecesEnTendencias.get(palabra) || 0) + 1);
+    }
+  }
+  const deTendencia = new Set(
+    relacionadas
+      .flatMap((keyword) => palabrasDe(keyword))
+      .filter((palabra) => (vecesEnTendencias.get(raiz(palabra)) || 0) >= 2),
+  );
 
   const competencia = titulosCompetencia
     .map((titulo) => String(titulo).trim())
@@ -55,7 +92,7 @@ export const analizarTitulos = ({
         palabra,
         competidores,
         enTendencias,
-        enTuTitulo: mias.has(palabra),
+        enTuTitulo: mias.has(raiz(palabra)),
         // Estar en las tendencias de MeLi pesa como dos competidores: es demanda
         // medida por MeLi, no la corazonada de un vendedor.
         score: competidores + (enTendencias ? 2 : 0),
@@ -69,13 +106,14 @@ export const analizarTitulos = ({
     soloTuyas: palabras.filter((p) => p.enTuTitulo && p.score === 0),
     tendencias: keywordsTendencia.map((keyword) => ({
       keyword,
-      cubierta: palabrasDe(keyword).every((palabra) => mias.has(palabra)),
+      cubierta: palabrasDe(keyword).every((palabra) => mias.has(raiz(palabra))),
+      relacionada: relacionadas.includes(keyword),
     })),
     totalCompetidores: competencia.length,
   };
 };
 
-export const tieneP = (titulo, palabra) => palabrasDe(titulo).includes(palabra);
+export const tieneP = (titulo, palabra) => raicesDe(titulo).has(raiz(palabra));
 
 export const alternarPalabra = (titulo, palabra) => {
   const base = String(titulo).trim();
@@ -83,7 +121,7 @@ export const alternarPalabra = (titulo, palabra) => {
 
   return base
     .split(/\s+/)
-    .filter((token) => normalizar(token) !== palabra)
+    .filter((token) => raiz(normalizar(token)) !== raiz(palabra))
     .join(" ")
     .trim();
 };

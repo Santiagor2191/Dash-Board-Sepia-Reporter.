@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { getSeoTitulos, getStatus, redirectToMercadoLibreAuth } from "../api";
 import { fNumber } from "../utils";
 import {
@@ -19,6 +19,8 @@ export default function SeoTitulos() {
   const [competencia, setCompetencia] = useState("");
   const [borrador, setBorrador] = useState("");
   const [copiado, setCopiado] = useState(false);
+  const [verOtras, setVerOtras] = useState(false);
+  const tarjetaRef = useRef(null);
 
   const fetchData = async (force = false) => {
     setLoading(true);
@@ -49,7 +51,13 @@ export default function SeoTitulos() {
     setCompetencia("");
     setBorrador(item.title || "");
     setCopiado(false);
+    setVerOtras(false);
   };
+
+  // Con 108 filas arriba, la tarjeta queda lejos: llevarla a la vista.
+  useEffect(() => {
+    if (seleccionadaId) tarjetaRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [seleccionadaId]);
 
   const titulosCompetencia = useMemo(
     () => competencia.split("\n").map((t) => t.trim()).filter(Boolean),
@@ -60,10 +68,14 @@ export default function SeoTitulos() {
     if (!seleccionada) return null;
     return analizarTitulos({
       tituloActual: borrador,
+      tituloBase: seleccionada.title || "",
       titulosCompetencia,
       keywordsTendencia: seleccionada.keywords || [],
     });
   }, [seleccionada, borrador, titulosCompetencia]);
+
+  const relacionadas = analisis?.tendencias.filter((t) => t.relacionada) || [];
+  const otras = analisis?.tendencias.filter((t) => !t.relacionada) || [];
 
   const copiar = async () => {
     await navigator.clipboard.writeText(borrador);
@@ -148,73 +160,104 @@ export default function SeoTitulos() {
       </section>
 
       {seleccionada && analisis && (
-        <>
-          <section className="panel">
-            <header className="panel-head">
-              <h2>Que busca la gente en {seleccionada.category_name || seleccionada.category_id}</h2>
-              <a href={seleccionada.permalink} target="_blank" rel="noopener noreferrer" style={{ color: "var(--accent-a)", fontSize: "0.78rem" }}>Ver tu publicacion</a>
-            </header>
+        <section className="panel" ref={tarjetaRef} style={{ borderColor: "var(--accent-a)" }}>
+          <header className="panel-head">
+            <h2>{seleccionada.title}</h2>
+            <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+              <a href={seleccionada.permalink} target="_blank" rel="noopener noreferrer" style={{ color: "var(--accent-a)", fontSize: "0.78rem" }}>Ver en MeLi</a>
+              <button className="btn" onClick={() => setSeleccionadaId(null)} style={{ fontSize: "0.75rem", padding: "4px 10px" }}>Cerrar</button>
+            </div>
+          </header>
 
-            {seleccionada.keywords?.length ? (
-              <>
-                <p style={{ color: "var(--muted)", fontSize: "0.82rem", marginTop: 0 }}>
-                  Lo mas buscado en esta categoria, segun MeLi. En verde lo que tu titulo ya cubre.
-                  Hace clic en una busqueda para abrirla en MeLi y ver quien esta ganando.
+          <div style={{ display: "grid", gap: 22 }}>
+            <div>
+              <h3 style={{ fontSize: "0.9rem", margin: "0 0 4px" }}>
+                1. Que busca la gente en {seleccionada.category_name || seleccionada.category_id}
+              </h3>
+
+              {relacionadas.length ? (
+                <>
+                  <p style={{ color: "var(--muted)", fontSize: "0.82rem", margin: "0 0 10px", lineHeight: 1.6 }}>
+                    Busquedas reales de MeLi que tienen que ver con tu producto. En verde las que tu titulo ya cubre.
+                    Hace clic para abrirlas y ver quien esta ganando.
+                  </p>
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                    {relacionadas.map(({ keyword, cubierta }) => (
+                      <a key={keyword}
+                        href={`https://listado.mercadolibre.com.co/${keyword.replace(/\s+/g, "-")}`}
+                        target="_blank" rel="noopener noreferrer" className="pill"
+                        style={{
+                          textDecoration: "none", fontSize: "0.82rem", padding: "6px 12px",
+                          color: cubierta ? "#22c55e" : "var(--text)",
+                          borderColor: cubierta ? "#22c55e" : undefined,
+                          background: cubierta ? "rgba(34,197,94,0.10)" : undefined,
+                        }}>
+                        {cubierta ? "* " : ""}{keyword}
+                      </a>
+                    ))}
+                  </div>
+                </>
+              ) : (
+                <p style={{ color: "var(--muted)", fontSize: "0.82rem", margin: "0 0 10px", lineHeight: 1.6 }}>
+                  Ninguna de las busquedas de esta categoria tiene que ver con tu producto.
+                  {otras.length > 0 && " Puede ser senal de que la publicacion esta en la categoria equivocada."}
+                  {" "}Pega titulos de competidores en el paso 2, que es la senal que si te sirve.
                 </p>
-                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                  {analisis.tendencias.map(({ keyword, cubierta }) => (
-                    <a key={keyword}
-                      href={`https://listado.mercadolibre.com.co/${keyword.replace(/\s+/g, "-")}`}
-                      target="_blank" rel="noopener noreferrer" className="pill"
-                      style={{
-                        textDecoration: "none", fontSize: "0.82rem", padding: "6px 12px",
-                        color: cubierta ? "#22c55e" : "var(--text)",
-                        borderColor: cubierta ? "#22c55e" : undefined,
-                        background: cubierta ? "rgba(34,197,94,0.10)" : undefined,
-                      }}>
-                      {cubierta ? "* " : ""}{keyword}
-                    </a>
-                  ))}
+              )}
+
+              {otras.length > 0 && (
+                <div style={{ marginTop: 10 }}>
+                  <button type="button" onClick={() => setVerOtras((v) => !v)}
+                    style={{ background: "none", border: "none", padding: 0, cursor: "pointer", color: "var(--muted)", fontSize: "0.78rem", textDecoration: "underline" }}>
+                    {verOtras ? "Ocultar" : `Ver las otras ${otras.length} busquedas de la categoria (marcas y productos que no vendes)`}
+                  </button>
+                  {verOtras && (
+                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 10, opacity: 0.55 }}>
+                      {otras.map(({ keyword }) => (
+                        <a key={keyword}
+                          href={`https://listado.mercadolibre.com.co/${keyword.replace(/\s+/g, "-")}`}
+                          target="_blank" rel="noopener noreferrer" className="pill"
+                          style={{ textDecoration: "none", fontSize: "0.8rem", padding: "5px 10px" }}>
+                          {keyword}
+                        </a>
+                      ))}
+                    </div>
+                  )}
                 </div>
-              </>
-            ) : (
-              <p style={{ color: "var(--muted)", fontSize: "0.85rem", marginTop: 0 }}>
-                MeLi no publica tendencias para esta categoria. Igual podes pegar titulos de competidores abajo.
+              )}
+            </div>
+
+            <div>
+              <h3 style={{ fontSize: "0.9rem", margin: "0 0 4px" }}>
+                2. Titulos de la competencia
+                <span style={{ color: "var(--muted)", fontWeight: 400, marginLeft: 8 }}>{titulosCompetencia.length} pegados</span>
+              </h3>
+              <p style={{ color: "var(--muted)", fontSize: "0.82rem", margin: "0 0 10px", lineHeight: 1.6 }}>
+                Abri una busqueda de arriba, copia el titulo de los 6 a 10 primeros resultados y pegalos aca,
+                uno por linea. La API de MeLi no deja leerlos, por eso van a mano.
               </p>
-            )}
-          </section>
+              <textarea
+                value={competencia}
+                onChange={(e) => setCompetencia(e.target.value)}
+                rows={7}
+                placeholder={"Sandalias Mujer Playa Comodas Verano\nSandalia Dama Plataforma Comoda\n..."}
+                style={{
+                  width: "100%", padding: 12, borderRadius: 8, resize: "vertical",
+                  background: "var(--panel-2, rgba(0,0,0,0.15))", color: "var(--text)",
+                  border: "1px solid var(--line)", fontSize: "0.85rem", fontFamily: "inherit", lineHeight: 1.6,
+                }}
+              />
+            </div>
 
-          <section className="panel">
-            <header className="panel-head">
-              <h2>Titulos de la competencia</h2>
-              <span>{titulosCompetencia.length} pegados</span>
-            </header>
-            <p style={{ color: "var(--muted)", fontSize: "0.82rem", marginTop: 0, lineHeight: 1.6 }}>
-              Abri una busqueda de arriba, copia el titulo de los 6 a 10 primeros resultados y pegalos aca,
-              uno por linea. La API de MeLi no deja leerlos, por eso van a mano.
-            </p>
-            <textarea
-              value={competencia}
-              onChange={(e) => setCompetencia(e.target.value)}
-              rows={8}
-              placeholder={"Sandalias Mujer Playa Comodas Verano\nSandalia Dama Plataforma Comoda\n..."}
-              style={{
-                width: "100%", padding: 12, borderRadius: 8, resize: "vertical",
-                background: "var(--panel-2, rgba(0,0,0,0.15))", color: "var(--text)",
-                border: "1px solid var(--line)", fontSize: "0.85rem", fontFamily: "inherit", lineHeight: 1.6,
-              }}
-            />
-          </section>
+            <div>
+              <h3 style={{ fontSize: "0.9rem", margin: "0 0 10px", display: "flex", justifyContent: "space-between" }}>
+                <span>3. Armar el titulo</span>
+                <span style={{ color: largo > MAX_TITULO ? "#ef4444" : largo < 45 ? "#f59e0b" : "#22c55e" }}>
+                  {largo} / {MAX_TITULO}
+                </span>
+              </h3>
 
-          <section className="panel">
-            <header className="panel-head">
-              <h2>Armar el titulo</h2>
-              <span style={{ color: largo > MAX_TITULO ? "#ef4444" : largo < 45 ? "#f59e0b" : "#22c55e", fontWeight: 700 }}>
-                {largo} / {MAX_TITULO}
-              </span>
-            </header>
-
-            <input
+              <input
               type="text" value={borrador} onChange={(e) => setBorrador(e.target.value)}
               style={{
                 width: "100%", padding: "12px 14px", borderRadius: 8, fontSize: "0.95rem",
@@ -267,11 +310,12 @@ export default function SeoTitulos() {
               </p>
             )}
 
-            <p style={{ color: "var(--muted)", fontSize: "0.8rem", marginTop: 14, lineHeight: 1.6 }}>
-              Copia el titulo y pegalo en MeLi a mano. Confirmado que MeLi acepta cambiar el titulo aunque la publicacion tenga ventas.
-            </p>
-          </section>
-        </>
+              <p style={{ color: "var(--muted)", fontSize: "0.8rem", marginTop: 14, lineHeight: 1.6 }}>
+                Copia el titulo y pegalo en MeLi a mano. Confirmado que MeLi acepta cambiar el titulo aunque la publicacion tenga ventas.
+              </p>
+            </div>
+          </div>
+        </section>
       )}
     </>
   );
