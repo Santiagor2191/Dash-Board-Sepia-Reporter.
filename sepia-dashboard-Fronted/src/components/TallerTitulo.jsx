@@ -87,14 +87,17 @@ export default function TallerTitulo({
         {otras.length > 0 && (
           <div style={{ marginTop: 10 }}>
             <button type="button" onClick={() => setVerOtras((v) => !v)}
-              style={{ background: "none", border: "none", padding: 0, cursor: "pointer", color: "var(--muted)", fontSize: "0.78rem", textDecoration: "underline" }}>
+              style={{ background: "none", border: "none", padding: 0, cursor: "pointer", color: "var(--text)", fontSize: "0.8rem", fontWeight: 600, textDecoration: "underline" }}>
               {verOtras ? "Ocultar" : `Ver las otras ${otras.length} busquedas de la categoria (marcas y productos que no vendes)`}
             </button>
             {verOtras && (
-              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 10, opacity: 0.55 }}>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 10 }}>
                 {otras.map(({ keyword }) => (
                   <a key={keyword} href={enlaceBusqueda(keyword)} target="_blank" rel="noopener noreferrer" className="pill"
-                    style={{ textDecoration: "none", fontSize: "0.8rem", padding: "5px 10px" }}>
+                    style={{
+                      textDecoration: "none", fontSize: "0.8rem", padding: "5px 10px",
+                      color: "var(--text)", fontWeight: 600,
+                    }}>
                     {keyword}
                   </a>
                 ))}
