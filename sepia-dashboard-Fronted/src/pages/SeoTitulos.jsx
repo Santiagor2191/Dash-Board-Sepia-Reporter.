@@ -134,6 +134,7 @@ export default function SeoTitulos() {
             key={seleccionada.id}
             keywords={seleccionada.keywords || []}
             categoriaNombre={seleccionada.category_name || seleccionada.category_id}
+            categoriaId={seleccionada.category_id}
             tituloBase={seleccionada.title}
           />
         </section>

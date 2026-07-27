@@ -106,6 +106,8 @@ export const getConversion = (force = false) =>
 export const getSeoTitulos = (force = false) =>
   request(`/meli/seo-titulos${force ? "?force=true" : ""}`);
 export const getCategoriasTendencias = () => request("/meli/categorias-tendencias");
+export const getCategoriaSugerida = (q) =>
+  request(`/meli/categoria-sugerida?q=${encodeURIComponent(q)}`);
 export const getAdsMetrics = () => request("/ads/metrics");
 export const getAdsDiagnose = () => request("/ads/diagnose");
 export const getRentabilidadResumen = () => request("/api/rentabilidad/resumen");

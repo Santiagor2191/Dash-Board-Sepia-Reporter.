@@ -516,6 +516,38 @@ export const createMeliRouter = ({ mlGet, meliOrdersService }) => {
     }
   });
 
+  // MeLi predice en que categoria cae un titulo. Si no coincide con donde esta
+  // publicado, ningun ajuste de palabras lo va a salvar: no lo esta viendo
+  // quien lo busca. Pesa mas que cualquier keyword.
+  router.get("/categoria-sugerida", async (req, res) => {
+    try {
+      const q = String(req.query.q || "").trim();
+      if (q.length < 3) {
+        return res.status(400).json({ ok: false, error: "Escribi al menos 3 caracteres." });
+      }
+
+      const me = await mlGet("/users/me");
+      const siteId = me?.site_id || "MCO";
+      const data = await mlGet(`/sites/${siteId}/domain_discovery/search`, { q, limit: 3 });
+
+      return res.json({
+        ok: true,
+        sugerencias: (Array.isArray(data) ? data : []).map((entrada) => ({
+          category_id: entrada.category_id,
+          category_name: entrada.category_name,
+          domain_name: entrada.domain_name,
+        })),
+      });
+    } catch (error) {
+      return sendInternalError(
+        res,
+        "Error consultando /meli/categoria-sugerida",
+        "No se pudo consultar la categoria sugerida",
+        error,
+      );
+    }
+  });
+
   // Para titular una publicacion que todavia no existe: las categorias en las
   // que Sepia ya vende, con lo que se busca en cada una.
   router.get("/categorias-tendencias", async (req, res) => {

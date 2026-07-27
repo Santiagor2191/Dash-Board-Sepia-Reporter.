@@ -15,6 +15,7 @@ vi.mock("../api", () => ({
     ],
   })),
   redirectToMercadoLibreAuth: vi.fn(),
+  getCategoriaSugerida: vi.fn(async () => ({ ok: true, sugerencias: [] })),
 }));
 
 import SeoTitulosNuevos from "./SeoTitulosNuevos.jsx";

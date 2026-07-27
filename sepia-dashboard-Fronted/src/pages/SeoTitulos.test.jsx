@@ -24,6 +24,11 @@ vi.mock("../api", () => ({
     }],
   })),
   redirectToMercadoLibreAuth: vi.fn(),
+  // MeLi dice que el titulo va en Zapatos, pero esta publicado en Sandalias.
+  getCategoriaSugerida: vi.fn(async () => ({
+    ok: true,
+    sugerencias: [{ category_id: "MCO1400", category_name: "Zapatos", domain_name: "Calzado para bebés" }],
+  })),
 }));
 
 import SeoTitulos from "./SeoTitulos.jsx";
@@ -63,6 +68,29 @@ describe("SeoTitulos", () => {
     await waitFor(() => expect(screen.getByText(/3\. Armar el titulo/)).toBeInTheDocument());
     expect(screen.queryByRole("button", { name: /skechers/ })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /nike/ })).not.toBeInTheDocument();
+  });
+
+  it("avisa cuando MeLi ubica el titulo en otra categoria", async () => {
+    render(<SeoTitulos />);
+    fireEvent.click(await screen.findByRole("button", { name: "Trabajar" }));
+    fireEvent.click(screen.getByRole("button", { name: /En que categoria cae/ }));
+
+    expect(await screen.findByText("Zapatos")).toBeInTheDocument();
+    expect(screen.getByText(/MeLi dice que su titulo va en otra parte/)).toBeInTheDocument();
+  });
+
+  it("marca los avisos de las reglas de MeLi sobre el titulo", async () => {
+    render(<SeoTitulos />);
+    fireEvent.click(await screen.findByRole("button", { name: "Trabajar" }));
+
+    fireEvent.change(screen.getByDisplayValue(/Sandalia Para Niña De Fiesta/), {
+      target: { value: "SANDALIA NIÑA NUEVA ENVIO GRATIS !!" },
+    });
+
+    expect(screen.getByText(/Sacá "NUEVA"/)).toBeInTheDocument();
+    expect(screen.getByText(/Sacá "ENVIO GRATIS"/)).toBeInTheDocument();
+    expect(screen.getByText(/simbolo "!"/)).toBeInTheDocument();
+    expect(screen.getByText(/MAYUSCULAS/)).toBeInTheDocument();
   });
 
   it("cierra la tarjeta", async () => {

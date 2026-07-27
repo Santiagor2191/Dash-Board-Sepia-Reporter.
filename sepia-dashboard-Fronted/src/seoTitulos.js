@@ -126,6 +126,54 @@ export const alternarPalabra = (titulo, palabra) => {
     .trim();
 };
 
+// Reglas oficiales de MeLi para titulos (ayuda de MeLi + guia de vendedores):
+// estructura Producto + Marca + Modelo, maximo 60 caracteres, sin repetir lo
+// que ya esta en la ficha tecnica, sin condicion, sin envio/pago, sin simbolos.
+const CONDICION = /\b(nuevo|nueva|usado|usada|seminuevo|reacondicionado|original(es)?)\b/i;
+const ENVIO_PAGO = /(envio|envío)\s*(gratis|nacional)|contra\s*entrega|mercadopago|mercado\s*pago|cuotas|domicilio\s*gratis|garantia|garantía|oferta|promocion|promoción|descuento/i;
+const SIMBOLOS = /[#%@!¡?¿*+_=<>{}[\]|~^"]/;
+
+export const validarTitulo = (titulo = "") => {
+  const texto = String(titulo).trim();
+  const avisos = [];
+  if (!texto) return avisos;
+
+  if (texto.length > MAX_TITULO) {
+    avisos.push({ nivel: "error", mensaje: `Te pasaste por ${texto.length - MAX_TITULO} caracteres. MeLi corta en ${MAX_TITULO}.` });
+  } else if (texto.length < 45) {
+    avisos.push({ nivel: "aviso", mensaje: `Te sobran ${MAX_TITULO - texto.length} caracteres sin usar. Cada palabra de mas es otra busqueda por la que te pueden encontrar.` });
+  }
+
+  const palabras = palabrasDe(texto).map(raiz);
+  const repetidas = [...new Set(palabras.filter((p, i) => palabras.indexOf(p) !== i))];
+  if (repetidas.length) {
+    avisos.push({ nivel: "aviso", mensaje: `Repetis ${repetidas.join(", ")}. Repetir no posiciona mejor y te come caracteres.` });
+  }
+
+  const condicion = texto.match(CONDICION);
+  if (condicion) {
+    avisos.push({ nivel: "aviso", mensaje: `Sacá "${condicion[0]}": la condicion ya se muestra sola, en el titulo solo ocupa lugar.` });
+  }
+
+  const envio = texto.match(ENVIO_PAGO);
+  if (envio) {
+    avisos.push({ nivel: "aviso", mensaje: `Sacá "${envio[0]}": MeLi ya lo muestra al lado del producto y no posiciona.` });
+  }
+
+  const simbolo = texto.match(SIMBOLOS);
+  if (simbolo) {
+    avisos.push({ nivel: "aviso", mensaje: `El simbolo "${simbolo[0]}" no ayuda a que te encuentren.` });
+  }
+
+  const letras = texto.replace(/[^a-zA-ZáéíóúñÁÉÍÓÚÑ]/g, "");
+  const mayus = letras.replace(/[^A-ZÁÉÍÓÚÑ]/g, "").length;
+  if (letras.length > 10 && mayus / letras.length > 0.6) {
+    avisos.push({ nivel: "aviso", mensaje: "Evita las MAYUSCULAS sostenidas: se lee peor y no posiciona mejor." });
+  }
+
+  return avisos;
+};
+
 // Arranca del titulo que YA escribio Santiago (tiene su criterio) y le va
 // pegando las palabras que le faltan mientras quepan en los 60 caracteres.
 export const sugerirTitulo = (tituloActual, faltantes = [], limite = MAX_TITULO) => {

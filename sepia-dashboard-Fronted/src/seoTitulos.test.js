@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
-  MAX_TITULO, palabrasDe, raiz, esRelacionada, analizarTitulos, alternarPalabra, sugerirTitulo,
+  MAX_TITULO, palabrasDe, raiz, esRelacionada, analizarTitulos, alternarPalabra, sugerirTitulo, validarTitulo,
 } from "./seoTitulos";
 
 describe("raiz", () => {
@@ -131,6 +131,49 @@ describe("alternarPalabra", () => {
   it("agrega si no esta y quita si ya esta, sin importar tildes", () => {
     expect(alternarPalabra("Sandalia Comoda", "playa")).toBe("Sandalia Comoda playa");
     expect(alternarPalabra("Zapato Niña Fiesta", "nina")).toBe("Zapato Fiesta");
+  });
+});
+
+describe("validarTitulo", () => {
+  const mensajes = (t) => validarTitulo(t).map((a) => a.mensaje).join(" | ");
+
+  it("no dice nada de un titulo vacio", () => {
+    expect(validarTitulo("")).toEqual([]);
+  });
+
+  it("marca error cuando se pasa de 60", () => {
+    const largo = "Sandalia Para Niña De Fiesta Elegante Primera Comunion Blanca Tacon";
+    const error = validarTitulo(largo).find((a) => a.nivel === "error");
+    expect(error.mensaje).toMatch(/Te pasaste por 7 caracteres/);
+  });
+
+  it("avisa cuando quedan caracteres sin usar", () => {
+    expect(mensajes("Sandalia Niña")).toMatch(/sobran 47 caracteres/);
+  });
+
+  it("detecta palabras repetidas aunque cambie el plural", () => {
+    expect(mensajes("Sandalia Niña Fiesta Sandalias Elegantes")).toMatch(/Repetis sandalia/);
+  });
+
+  it("detecta la condicion, que MeLi pide no poner", () => {
+    expect(mensajes("Sandalia Niña Fiesta Elegante Nueva Original")).toMatch(/Sacá "Nueva"/);
+  });
+
+  it("detecta envio y medios de pago", () => {
+    expect(mensajes("Sandalia Niña Fiesta Envio Gratis")).toMatch(/Sacá "Envio Gratis"/);
+    expect(mensajes("Sandalia Niña Fiesta 12 Cuotas Sin Interes")).toMatch(/cuotas/i);
+  });
+
+  it("detecta simbolos raros", () => {
+    expect(mensajes("Sandalia Niña Fiesta !! Elegante")).toMatch(/simbolo "!"/);
+  });
+
+  it("detecta mayusculas sostenidas", () => {
+    expect(mensajes("SANDALIA NIÑA FIESTA ELEGANTE COMUNION")).toMatch(/MAYUSCULAS/);
+  });
+
+  it("deja pasar limpio un titulo que cumple", () => {
+    expect(validarTitulo("Sandalia Niña Fiesta Elegante Tacon Bajo Ceremonia")).toEqual([]);
   });
 });
 
