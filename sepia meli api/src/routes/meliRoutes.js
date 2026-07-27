@@ -516,6 +516,49 @@ export const createMeliRouter = ({ mlGet, meliOrdersService }) => {
     }
   });
 
+  // Para titular una publicacion que todavia no existe: las categorias en las
+  // que Sepia ya vende, con lo que se busca en cada una.
+  router.get("/categorias-tendencias", async (req, res) => {
+    try {
+      const me = await mlGet("/users/me");
+      const siteId = me?.site_id || "MCO";
+      const { data } = await getInventoryPayload(me.id);
+
+      const categorias = new Map();
+      for (const item of data.items) {
+        if (item.status !== "active" || !item.category_id) continue;
+        const previa = categorias.get(item.category_id);
+        categorias.set(item.category_id, {
+          id: item.category_id,
+          nombre: item.category_name || item.category_id,
+          publicaciones: (previa?.publicaciones || 0) + 1,
+        });
+      }
+
+      const conKeywords = await mapWithConcurrency(
+        [...categorias.values()],
+        TRENDS_LOOKUP_CONCURRENCY,
+        async (categoria) => ({
+          ...categoria,
+          keywords: await getCategoryTrends(siteId, categoria.id),
+        }),
+      );
+
+      return res.json({
+        ok: true,
+        site_id: siteId,
+        categorias: conKeywords.sort((a, b) => a.nombre.localeCompare(b.nombre)),
+      });
+    } catch (error) {
+      return sendInternalError(
+        res,
+        "Error consultando /meli/categorias-tendencias",
+        "No se pudieron consultar las categorias",
+        error,
+      );
+    }
+  });
+
   router.get("/seo-titulos", async (req, res) => {
     try {
       const force = String(req.query.force || "").toLowerCase() === "true";

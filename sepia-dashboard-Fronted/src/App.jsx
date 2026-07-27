@@ -26,7 +26,13 @@ const NAV_ITEMS = [
   { type: "group", key: "crm", label: "CRM", icon: "CR", basePath: "/crm", children: CRM_SECTIONS },
   { type: "link", path: "/rentabilidad", label: "Rentabilidad", icon: "$" },
   { type: "link", path: "/conversion", label: "Conversion", icon: "%" },
-  { type: "link", path: "/seo-titulos", label: "SEO Titulos", icon: "TT" },
+  {
+    type: "group", key: "seo", label: "SEO Titulos", icon: "TT", basePath: "/seo-titulos",
+    children: [
+      { slug: "publicaciones", label: "Nuestras publicaciones" },
+      { slug: "nuevas", label: "Publicaciones nuevas" },
+    ],
+  },
   { type: "link", path: "/sync", label: "Sync", icon: "⟳" },
 ];
 
@@ -41,7 +47,14 @@ export default function App() {
   const [isMobileViewport, setIsMobileViewport] = useState(() => typeof window !== "undefined" ? window.innerWidth <= MOBILE_BREAKPOINT : false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [sidebarMobileOpen, setSidebarMobileOpen] = useState(false);
-  const [crmExpanded, setCrmExpanded] = useState(false);
+  // Un grupo del menu abierto o cerrado, por key: CRM, SEO, y los que vengan.
+  const [gruposAbiertos, setGruposAbiertos] = useState(() => {
+    const path = typeof window !== "undefined" ? window.location.pathname : "";
+    return Object.fromEntries(
+      NAV_ITEMS.filter((item) => item.type === "group")
+        .map((item) => [item.key, path.startsWith(item.basePath)]),
+    );
+  });
   const [loginPassword, setLoginPassword] = useState("");
   const [auth, setAuth] = useState({
     ready: false,
@@ -98,7 +111,10 @@ export default function App() {
   }, [isMobileViewport, sidebarMobileOpen]);
 
   useEffect(() => {
-    if (location.pathname.startsWith("/crm")) setCrmExpanded(true);
+    const grupo = NAV_ITEMS.find(
+      (item) => item.type === "group" && location.pathname.startsWith(item.basePath),
+    );
+    if (grupo) setGruposAbiertos((prev) => (prev[grupo.key] ? prev : { ...prev, [grupo.key]: true }));
   }, [location.pathname]);
 
   useEffect(() => {
@@ -345,18 +361,19 @@ export default function App() {
           {NAV_ITEMS.map((item) => {
             if (item.type === "group") {
               const isGroupActive = location.pathname.startsWith(item.basePath);
+              const abierto = gruposAbiertos[item.key] ?? false;
               return (
                 <div key={item.key} className="nav-group">
                   <button
                     type="button"
                     className={`nav-item nav-group-toggle ${isGroupActive ? "active" : ""}`}
-                    aria-expanded={crmExpanded}
-                    onClick={() => setCrmExpanded((p) => !p)}
+                    aria-expanded={abierto}
+                    onClick={() => setGruposAbiertos((prev) => ({ ...prev, [item.key]: !abierto }))}
                   >
                     <span>{item.icon}</span><span>{item.label}</span>
-                    <span className="nav-group-caret">{crmExpanded ? "▾" : "▸"}</span>
+                    <span className="nav-group-caret">{abierto ? "▾" : "▸"}</span>
                   </button>
-                  {crmExpanded && (
+                  {abierto && (
                     <div className="nav-group-children">
                       {item.children.map((child) => (
                         <NavLink
