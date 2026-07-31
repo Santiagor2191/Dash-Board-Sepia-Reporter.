@@ -85,11 +85,25 @@ export default function Dashboard() {
     costosMap?.[o.item.id] ?? costosTitleMap?.[normalizeTitle(o.item.title)] ?? 0,
   [costosMap, costosTitleMap]);
 
-  const costoProducto = useMemo(() => {
-    let total = 0;
-    for (const o of filteredAll) total += getCosto(o) * o.qty;
-    return total;
+  // Cobertura = porcion de la venta que sí tiene costo cargado. Las ventas sin
+  // costo cuentan como utilidad pura, así que un rango con cobertura baja infla
+  // la Utilidad Neta. Las ventas anteriores a 2025 no traen publicacion_id, así
+  // que casi ninguna cruza contra el Excel de rentabilidad.
+  const { costoProducto, coberturaCostos } = useMemo(() => {
+    let total = 0, conCosto = 0, base = 0;
+    for (const o of filteredAll) {
+      const costo = getCosto(o);
+      total += costo * o.qty;
+      const venta = o.paidAmount || o.amount || 0;
+      base += venta;
+      if (costo > 0) conCosto += venta;
+    }
+    return { costoProducto: total, coberturaCostos: base > 0 ? (conCosto / base) * 100 : 100 };
   }, [filteredAll, getCosto]);
+
+  const notaCobertura = coberturaCostos < 99
+    ? `${coberturaCostos < 90 ? "⚠ " : ""}Cobertura de costos ${coberturaCostos.toFixed(0)}%`
+    : null;
 
   const prevCostoProducto = useMemo(() => {
     let total = 0;
@@ -111,8 +125,8 @@ export default function Dashboard() {
     { stripeClass: "stripe-c", label: "Precio de Venta", value: fCurrency(totalIngresado), delta: calcDelta(totalIngresado, prevIngresado) },
     { stripeClass: "stripe-b", label: "Ingresos Sepia", value: fCurrency(totalRevenue), delta: calcDelta(totalRevenue, prevRevenue) },
     { stripeClass: "stripe-e", label: "Cargos por Venta", value: fCurrency(totalCargos), delta: calcDelta(totalCargos, prevCargos) },
-    { stripeClass: "stripe-a", label: "Costo Producto", value: fCurrency(costoProducto), delta: calcDelta(costoProducto, prevCostoProducto) },
-    { stripeClass: "stripe-b", label: "Utilidad Neta", value: fCurrency(utilidadNeta), delta: calcDelta(utilidadNeta, prevUtilidadNeta) },
+    { stripeClass: "stripe-a", label: "Costo Producto", value: fCurrency(costoProducto), delta: calcDelta(costoProducto, prevCostoProducto), note: notaCobertura },
+    { stripeClass: "stripe-b", label: "Utilidad Neta", value: fCurrency(utilidadNeta), delta: calcDelta(utilidadNeta, prevUtilidadNeta), note: notaCobertura },
     { stripeClass: "stripe-a", label: "Ordenes Totales", value: fNumber(totalOrders), delta: calcDelta(totalOrders, prevOrdersCount) },
     { stripeClass: "stripe-d", label: "Unidades Vendidas", value: fNumber(totalUnits), delta: calcDelta(totalUnits, prevUnits) },
     { stripeClass: "stripe-d", label: "Ticket Promedio", value: fCurrency(ticketAverage), delta: calcDelta(ticketAverage, prevTicket) },

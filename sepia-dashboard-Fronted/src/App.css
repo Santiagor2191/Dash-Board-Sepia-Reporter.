@@ -651,6 +651,13 @@ body {
 .kpi-delta.down { color: #f87171; }
 .kpi-delta.flat { color: var(--muted); }
 
+/* Aviso bajo el KPI: hoy solo lo usa la cobertura de costos. */
+.kpi-note {
+  margin-top: 4px;
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+
 .panel-grid {
   display: grid;
   grid-template-columns: 1.3fr 1fr;
