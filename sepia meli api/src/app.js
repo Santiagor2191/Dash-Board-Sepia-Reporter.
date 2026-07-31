@@ -226,8 +226,12 @@ export const buildApp = () => {
 
   app.use(createMcpBridgeRouter());
 
+  // Render expone el commit desplegado en RENDER_GIT_COMMIT; en local no existe.
+  // Sirve para verificar desde fuera que un deploy llego, sin abrir sesion.
+  const commit = (process.env.RENDER_GIT_COMMIT || "").slice(0, 7) || "local";
+  const startedAt = new Date().toISOString();
   app.get("/", (req, res) => {
-    res.json({ ok: true });
+    res.json({ ok: true, commit, startedAt });
   });
   app.post("/notifications", (req, res) => {
     res.status(200).send("ok");
