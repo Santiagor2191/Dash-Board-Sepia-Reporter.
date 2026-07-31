@@ -174,9 +174,15 @@ export const createRentabilidadService = ({ rentabilidadPool, dbPool }) => {
       .substring(0, 45);
   };
 
+  // El dashboard resta este costo a "Ingresos Sepia", que YA viene neto de la
+  // comision de MeLi. Como costo_total del Excel tambien incluye esa comision,
+  // devolverlo entero la restaba dos veces y hundia la Utilidad Neta (7,8% de
+  // margen cuando el real ronda 36%). Se descuenta cargo_por_venta_ml para que
+  // la comision se reste una sola vez, la real de cada venta via el neto.
   const getCostosMap = async () => {
     const [rows] = await rentabilidadPool.query(`
-      SELECT id_publicaciones, titulo, costo_total
+      SELECT id_publicaciones, titulo,
+             (costo_total - COALESCE(cargo_por_venta_ml, 0)) AS costo_sin_comision
       FROM publicaciones_rentabilidad
       WHERE costo_total IS NOT NULL AND costo_total > 0
     `);
@@ -184,7 +190,7 @@ export const createRentabilidadService = ({ rentabilidadPool, dbPool }) => {
     const costosPorTitulo = {};
     for (const r of rows) {
       const id = r.id_publicaciones;
-      const costo = Number(r.costo_total);
+      const costo = Number(r.costo_sin_comision);
       // Mapa por ID — ambas variantes MCO/MCOU
       costos[id] = costo;
       if (id.startsWith("MCOU")) costos[id.replace("MCOU", "MCO")] = costo;
