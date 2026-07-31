@@ -82,8 +82,14 @@ export const createHistoricalSalesService = ({ dbPool }) => {
     const [rows] = await dbPool.query(`
       SELECT id, anio, mes, num_mes, dia, fecha, numero_venta, estado,
              producto, categoria, variante_talla, cantidad,
-             monto_reportado_cop, ingresos_productos_cop,
-             cargo_venta_impuestos_cop, ingresos_envio_cop,
+             -- Hasta 2024 la carga del Excel dejó monto_reportado como bruto e
+             -- ingresos_productos como neto; desde 2025 el sync los escribe al
+             -- revés. bruto_cop/neto_cop son columnas generadas que normalizan
+             -- las dos épocas, y el cargo se deriva para que siempre sea negativo.
+             neto_cop AS monto_reportado_cop,
+             bruto_cop AS ingresos_productos_cop,
+             (neto_cop - bruto_cop) AS cargo_venta_impuestos_cop,
+             ingresos_envio_cop,
              costos_envio_cop, anulaciones_reembolsos_cop,
              sku, publicacion_id, precio_unitario_publicacion_cop,
              comprador, ciudad, forma_entrega, origen_dato
@@ -139,8 +145,8 @@ export const createHistoricalSalesService = ({ dbPool }) => {
     const [[porAnio], [total]] = await Promise.all([
       dbPool.query(`
         SELECT anio, COUNT(*) AS filas,
-               SUM(monto_reportado_cop) AS revenue,
-               SUM(ingresos_productos_cop) AS ingresos
+               SUM(neto_cop) AS revenue,
+               SUM(bruto_cop) AS ingresos
         FROM ventas_ml
         GROUP BY anio ORDER BY anio
       `),
@@ -173,16 +179,16 @@ export const createHistoricalSalesService = ({ dbPool }) => {
       dbPool.query(`
         SELECT producto,
                SUM(CASE WHEN fecha >= CURRENT_DATE - INTERVAL '3 months'
-                        THEN monto_reportado_cop ELSE 0 END)              AS revenue_actual,
+                        THEN neto_cop ELSE 0 END)              AS revenue_actual,
                SUM(CASE WHEN fecha >= CURRENT_DATE - INTERVAL '6 months'
                          AND fecha <  CURRENT_DATE - INTERVAL '3 months'
-                        THEN monto_reportado_cop ELSE 0 END)              AS revenue_anterior,
-               SUM(monto_reportado_cop)                                   AS revenue,
+                        THEN neto_cop ELSE 0 END)              AS revenue_anterior,
+               SUM(neto_cop)                                   AS revenue,
                COUNT(*)                                                   AS ordenes
         FROM ventas_ml
         WHERE producto IS NOT NULL
         GROUP BY producto
-        HAVING SUM(monto_reportado_cop) > 0
+        HAVING SUM(neto_cop) > 0
         ORDER BY revenue DESC
         LIMIT 10
       `),
@@ -191,7 +197,7 @@ export const createHistoricalSalesService = ({ dbPool }) => {
       dbPool.query(`
         SELECT a.producto AS producto_a, b.producto AS producto_b,
                COUNT(DISTINCT a.comprador)                              AS veces,
-               SUM(a.monto_reportado_cop) + SUM(b.monto_reportado_cop) AS revenue_combinado
+               SUM(a.neto_cop) + SUM(b.neto_cop) AS revenue_combinado
         FROM ventas_ml a
         JOIN ventas_ml b ON a.comprador = b.comprador
                         AND a.producto < b.producto
@@ -209,9 +215,9 @@ export const createHistoricalSalesService = ({ dbPool }) => {
                TO_CHAR(TO_DATE(num_mes::text, 'MM'), 'Mon') AS mes,
                ROUND(AVG(revenue_mensual))                  AS revenue
         FROM (
-          SELECT anio, num_mes, SUM(monto_reportado_cop) AS revenue_mensual
+          SELECT anio, num_mes, SUM(neto_cop) AS revenue_mensual
           FROM ventas_ml
-          WHERE monto_reportado_cop IS NOT NULL
+          WHERE neto_cop IS NOT NULL
           GROUP BY anio, num_mes
         ) sub
         GROUP BY num_mes
@@ -223,25 +229,25 @@ export const createHistoricalSalesService = ({ dbPool }) => {
         SELECT producto,
                SUM(CASE WHEN fecha >= CURRENT_DATE - INTERVAL '6 months'
                          AND fecha <  CURRENT_DATE - INTERVAL '3 months'
-                        THEN monto_reportado_cop ELSE 0 END) AS revenue_anterior,
+                        THEN neto_cop ELSE 0 END) AS revenue_anterior,
                SUM(CASE WHEN fecha >= CURRENT_DATE - INTERVAL '3 months'
-                        THEN monto_reportado_cop ELSE 0 END) AS revenue_actual
+                        THEN neto_cop ELSE 0 END) AS revenue_actual
         FROM ventas_ml
         WHERE producto IS NOT NULL
         GROUP BY producto
         HAVING SUM(CASE WHEN fecha >= CURRENT_DATE - INTERVAL '6 months'
                          AND fecha <  CURRENT_DATE - INTERVAL '3 months'
-                        THEN monto_reportado_cop ELSE 0 END) > 0
+                        THEN neto_cop ELSE 0 END) > 0
            AND SUM(CASE WHEN fecha >= CURRENT_DATE - INTERVAL '3 months'
-                        THEN monto_reportado_cop ELSE 0 END)
+                        THEN neto_cop ELSE 0 END)
              < SUM(CASE WHEN fecha >= CURRENT_DATE - INTERVAL '6 months'
                          AND fecha <  CURRENT_DATE - INTERVAL '3 months'
-                        THEN monto_reportado_cop ELSE 0 END) * 0.8
+                        THEN neto_cop ELSE 0 END) * 0.8
         ORDER BY (SUM(CASE WHEN fecha >= CURRENT_DATE - INTERVAL '3 months'
-                           THEN monto_reportado_cop ELSE 0 END)
+                           THEN neto_cop ELSE 0 END)
                 - SUM(CASE WHEN fecha >= CURRENT_DATE - INTERVAL '6 months'
                             AND fecha < CURRENT_DATE - INTERVAL '3 months'
-                           THEN monto_reportado_cop ELSE 0 END)) ASC
+                           THEN neto_cop ELSE 0 END)) ASC
         LIMIT 10
       `),
 
@@ -249,15 +255,15 @@ export const createHistoricalSalesService = ({ dbPool }) => {
       dbPool.query(`
         WITH v AS (
           SELECT CASE WHEN lower(trim(ciudad)) = ANY($1) THEN 'Bogotá' ELSE trim(ciudad) END AS ciudad,
-                 monto_reportado_cop
+                 neto_cop
           FROM ventas_ml
           WHERE ciudad IS NOT NULL AND trim(ciudad) != ''
         )
         SELECT ciudad,
-               SUM(monto_reportado_cop)                                       AS revenue,
+               SUM(neto_cop)                                       AS revenue,
                COUNT(*)                                                       AS ordenes,
-               ROUND(SUM(monto_reportado_cop) * 100.0
-                     / NULLIF(SUM(SUM(monto_reportado_cop)) OVER (), 0), 2)  AS porcentaje
+               ROUND(SUM(neto_cop) * 100.0
+                     / NULLIF(SUM(SUM(neto_cop)) OVER (), 0), 2)  AS porcentaje
         FROM v
         GROUP BY ciudad
         ORDER BY revenue DESC
@@ -267,11 +273,11 @@ export const createHistoricalSalesService = ({ dbPool }) => {
       // 6. Ticket por categoria
       dbPool.query(`
         SELECT COALESCE(categoria, 'General') AS categoria,
-               ROUND(AVG(monto_reportado_cop)) AS ticket_promedio,
+               ROUND(AVG(bruto_cop))           AS ticket_promedio,
                COUNT(*)                        AS ordenes,
-               SUM(monto_reportado_cop)        AS revenue
+               SUM(neto_cop)        AS revenue
         FROM ventas_ml
-        WHERE monto_reportado_cop IS NOT NULL AND monto_reportado_cop > 0
+        WHERE neto_cop IS NOT NULL AND neto_cop > 0
         GROUP BY categoria
         ORDER BY ticket_promedio DESC
       `),
@@ -280,9 +286,9 @@ export const createHistoricalSalesService = ({ dbPool }) => {
       dbPool.query(`
         WITH producto_revenue AS (
           SELECT producto,
-                 SUM(monto_reportado_cop) AS revenue
+                 SUM(neto_cop) AS revenue
           FROM ventas_ml
-          WHERE producto IS NOT NULL AND monto_reportado_cop IS NOT NULL
+          WHERE producto IS NOT NULL AND neto_cop IS NOT NULL
           GROUP BY producto
         ),
         acumulados AS (

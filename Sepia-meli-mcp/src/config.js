@@ -17,7 +17,10 @@ export const MELI_API_BASE = "https://api.mercadolibre.com";
 
 export const MELI_CLIENT_ID = trimmed(process.env.MELI_CLIENT_ID);
 export const MELI_CLIENT_SECRET = trimmed(process.env.MELI_CLIENT_SECRET);
-export const MELI_REDIRECT_URI = trimmed(process.env.MELI_REDIRECT_URI);
+// El .env guarda la URL publica como MCP_REDIRECT_URI; aceptamos los dos nombres.
+export const MELI_REDIRECT_URI = trimmed(
+  process.env.MELI_REDIRECT_URI || process.env.MCP_REDIRECT_URI
+);
 
 export const INITIAL_ACCESS_TOKEN = trimmed(process.env.MELI_ACCESS_TOKEN);
 export const INITIAL_REFRESH_TOKEN = trimmed(process.env.MELI_REFRESH_TOKEN);
@@ -39,6 +42,7 @@ export const DB_USER = trimmed(process.env.DB_USER) || "postgres";
 export const DB_PASSWORD = trimmed(process.env.DB_PASSWORD);
 export const DB_NAME = trimmed(process.env.DB_NAME) || "mercado_libre_oficial";
 export const DB_CONNECTION_LIMIT = num(process.env.DB_CONNECTION_LIMIT, 3);
+export const DB_SSL = trimmed(process.env.DB_SSL) === "true";
 
 export const TOKEN_FILE = path.join(projectRoot, ".tokens.json");
 

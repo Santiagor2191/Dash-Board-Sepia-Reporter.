@@ -6,6 +6,7 @@ import {
   DB_PASSWORD,
   DB_NAME,
   DB_CONNECTION_LIMIT,
+  DB_SSL,
 } from "./config.js";
 
 const { Pool } = pg;
@@ -17,6 +18,7 @@ const pool = new Pool({
   password: DB_PASSWORD,
   database: DB_NAME,
   max: DB_CONNECTION_LIMIT,
+  ssl: DB_SSL ? { rejectUnauthorized: false } : false,
 });
 
 export const dbQuery = async (text, params) => {
