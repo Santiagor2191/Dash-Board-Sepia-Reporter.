@@ -36,7 +36,20 @@ El error que casi cometemos: medimos julio, que es el piso del año para la lín
 | Kit Cirio de Bautizo | 7 | 4,9% |
 | Mancornas Doctor Strange | 10 | 10,3% |
 
-**Antes de pedir: pregúntale al proveedor cuánto tarda.** Ese dato no lo tenemos y define todo el calendario. Si tarda 4 semanas, pedir hoy ya es justo para septiembre.
+**Hecho el 2026-07-31: los bolos ya se pidieron, llegan en ~15 días** (mediados de agosto,
+a tiempo para la temporada). Ese plazo de 15 días es ahora la regla de compra de todo el
+calendario, ver la sección de estacionalidad al final.
+
+**Falta pedir tres más**, que la estacionalidad destapó y no estaban en esta lista:
+
+| Producto | Vendió oct-nov 2025 | Stock hoy | Alcanza |
+|---|---|---|---|
+| Tirantes Cargaderas + Corbatín | 17 uds | 2 | 7 días |
+| Peineta Novia Matrimonio | 13 uds | 4 | 19 días |
+| Corbata Satinada Slim Juvenil | **100 uds** | 57 | 35 días |
+
+Los tres parecían muertos en julio, y dos estaban en la lista de "peores publicaciones".
+Son estacionales de segundo semestre.
 
 ## Movimiento 2 — Liquidar solo lo que nunca vendió ($3,1M)
 
@@ -182,3 +195,85 @@ Tres números, en `/conversion` o preguntándole al chat:
 ---
 
 Anexo: [publicaciones-flojas.md](publicaciones-flojas.md) y [publicaciones-sin-venta-2026-07.csv](publicaciones-sin-venta-2026-07.csv)
+
+---
+
+# Calendario de estacionalidad
+
+Añadido 2026-07-31. Base: 2021-2026 en Neon, normalizado por año (cada mes se
+divide entre los años que tienen dato, porque faltan agosto y diciembre de 2024
+y enero de 2021). Agrupado por palabras clave del producto, no por la columna
+`categoria`, que cambió de nombres en 2026.
+
+## Índice por línea de negocio
+
+100 = mes promedio de esa línea. En **negrita** los meses 50% o más sobre su promedio.
+
+| Línea | uds/año | ene | feb | mar | abr | may | jun | jul | ago | sep | oct | nov | dic |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| Corbatería caballero | 835 | 70 | 69 | 87 | 89 | 119 | 81 | 94 | 78 | 91 | **156** | **168** | 100 |
+| Ceremonia religiosa | 320 | 44 | 46 | 73 | 82 | 96 | 63 | 61 | 123 | 116 | **171** | **198** | 128 |
+| Ropa y calzado niño | 188 | 65 | 85 | 70 | 68 | 96 | 63 | 56 | 88 | 86 | **175** | **207** | 142 |
+| Novia y matrimonio | 173 | 63 | 87 | 122 | 109 | 110 | 68 | 71 | 68 | 88 | **186** | 122 | 108 |
+| Quinceañera y tiaras | 161 | 67 | 66 | 81 | 86 | 93 | 85 | 71 | 99 | 82 | **184** | **191** | 95 |
+| Joyería y bisutería | 70 | 68 | 68 | 88 | 85 | **154** | 94 | 60 | 90 | 75 | 143 | 96 | **179** |
+| **LA TIENDA** | **1.902** | 63 | 70 | 84 | 84 | 112 | 79 | 76 | 89 | 95 | **170** | **168** | 110 |
+
+## Las cuatro temporadas
+
+**1. Octubre y noviembre: EL negocio.** Índice 170 y 168, el doble de enero. Las
+seis líneas pican a la vez. Aquí se juega el año.
+
+La demanda está **repartida**, no concentrada en Black Friday: octubre reparte
+14% / 15% / 28% / 31% / 12% por semana, y noviembre día a día es plano. No es un
+pico de campaña, es demanda real. La segunda quincena de octubre es la más
+fuerte (59% del mes entre el 15 y el 28).
+
+**2. Mayo: pico secundario.** Índice 112. Lo mueven corbatería (119) y sobre todo
+joyería (154), que es su mejor mes junto con diciembre. Día de la madre.
+
+**3. Diciembre: temporada de regalo.** Índice 110, pero con mezcla distinta:
+joyería 179 y ropa de niño 142, mientras corbatería cae a 100.
+
+**4. Enero y febrero: el piso.** Índice 63 y 67. Ninguna línea levanta. Es el mes
+de ordenar el inventario, no de comprar.
+
+Fuera de eso, **marzo y abril son de novia y matrimonio** (122 y 109): la única
+línea que sube en el primer trimestre.
+
+## Qué se vende en cada pico
+
+| Mes | Los que mandan |
+|---|---|
+| Mayo | Kit Corbatín Pañuelo y Mancornas (54 uds), Corbatín Caballero (25), Pañoletas Dama |
+| Agosto | Kit Primera Comunión (22), Corbatín Caballero (22), Corbata Satinada Slim Juvenil (18) |
+| Septiembre | Kit PC (35), Kit Corbatín Pañuelo y Mancornas (35), Corbata Satinada Slim Juvenil (20) |
+| **Octubre** | **Corbata Satinada Slim Juvenil (86)**, Pañoletas Dama (74), Kit PC (46) |
+| **Noviembre** | **Kit Corbatín Pañuelo y Mancornas (61)**, Kit PC (46), Kit Corbatín (46) |
+| Diciembre | Kit Corbatín (28), Kit PC (27), cirios de bautizo |
+
+## Regla de compra
+
+El proveedor tarda **~15 días** (confirmado 2026-07-31 con el pedido de bolos).
+
+- **Pedido de temporada alta: sale antes del 15 de septiembre.** Si sale el 1 de
+  octubre, la mercancía llega el 15 y se pierde la primera mitad del mes fuerte.
+- **Pedido de mayo: sale antes del 15 de abril.**
+- **Enero y febrero no se compra.** Es el piso del año.
+
+## Stock contra la temporada que viene
+
+Unidades vendidas en oct-nov 2025 contra el stock de hoy:
+
+| Producto | oct-nov 2025 | Stock | Alcanza |
+|---|---|---|---|
+| Tirantes Cargaderas + Corbatín | 17 uds | **2** | **7 días** |
+| Peineta Novia Matrimonio | 13 uds | **4** | **19 días** |
+| Corbata Satinada Slim Juvenil | **100 uds** | 57 | 35 días |
+| Cirio de Bautizo Decorados | 23 uds | 26 | 69 días |
+| Kit Corbatín Pañuelo Caballero | 42 uds | 59 | 86 días |
+| Kit Primera Comunión | 18 uds | 29 | 98 días |
+
+Los tres primeros se agotan en plena temporada. La Corbata Satinada Slim Juvenil
+es el caso más grave: **es el producto más vendido de octubre con 100 unidades** y
+solo hay 57. Se agota a mediados de noviembre.
